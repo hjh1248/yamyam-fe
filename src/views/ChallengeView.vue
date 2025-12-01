@@ -167,6 +167,7 @@ const quitChallenge = (challenge) => {
           <router-link to="/diet" class="nav-item">식단 관리</router-link>
           <router-link to="/board" class="nav-item">게시판</router-link>
           <router-link to="/challenge" class="nav-item active">챌린지</router-link>
+          <router-link to="/mypage" class="nav-item">마이페이지</router-link>
         </nav>
 
         <div class="user-menu">

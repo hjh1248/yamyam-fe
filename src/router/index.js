@@ -9,6 +9,7 @@ import BoardView from '../views/BoardView.vue'
 import WriteBoardView from '../views/WriteBoardView.vue'
 import BoardDetailView from '../views/BoardDetailView.vue'
 import ChallengeView from '../views/ChallengeView.vue'
+import MyPageView from '../views/MyPageView.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -66,6 +67,11 @@ const router = createRouter({
       path: '/challenge',
       name: 'challenge',
       component: ChallengeView
+    },
+    {
+      path: '/mypage',
+      name: 'mypage',
+      component: MyPageView
     }
   ]
 })
