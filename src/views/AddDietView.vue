@@ -1,173 +1,70 @@
 <script setup>
-import { ref, onMounted, onUnmounted, computed } from 'vue'
-import { useRouter, useRoute } from 'vue-router'
+import { ref, computed } from 'vue'
+import { useRouter } from 'vue-router'
 import axios from 'axios'
+import AppHeader from '@/components/AppHeader.vue'
+import { VueDatePicker } from '@vuepic/vue-datepicker'
+import '@vuepic/vue-datepicker/dist/main.css'
 
 const router = useRouter()
-const route = useRoute()
+
 
 // 폼 데이터
-const mealType = ref('아침')
-const foods = ref([
-  { name: '', amount: 100, unit: 'g', caloriePerG: 0, caloriePerMl: 0 }
-])
+const formData = ref({
+  title: '',
+  content: '',
+  startDate: null,
+  endDate: null
+})
+
+// 날짜 표시용 포맷 함수 (VueDatePicker용 - "2025년 12월 11일" 형식)
+const formatDateDisplay = (date) => {
+  if (!date) return ''
+  
+  const d = new Date(date)
+  const year = d.getFullYear()
+  const month = d.getMonth() + 1
+  const day = d.getDate()
+  
+  return `${year}년 ${month}월 ${day}일`
+}
+
+// API 전송용 날짜 포맷 함수 (YYYY-MM-DD 형식)
+const formatDateForAPI = (date) => {
+  // 이미 문자열 형식이면 그대로 반환
+  if (typeof date === 'string') return date
+
+  // Date 객체인 경우 변환
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
 
 // 토스트 메시지
 const showToast = ref(false)
 const toastMessage = ref('')
 
-// 자동완성 관련
-const searchResults = ref([])
-const activeFoodIndex = ref(null)
-const showAutocomplete = ref(false)
-let searchTimeout = null
-let isSelecting = false
-
 // 네트워크 오류
 const networkError = ref(false)
 const errorMessage = ref('')
 
-// 단위 옵션
-const unitOptions = ['g', 'ml']
+// 제출 중 상태
+const isSubmitting = ref(false)
 
-// 외부 클릭 감지
-const handleClickOutside = (event) => {
-  // autocomplete-wrapper 밖을 클릭하면 자동완성 닫기
-  const target = event.target
-  if (!target.closest('.autocomplete-wrapper')) {
-    showAutocomplete.value = false
-    activeFoodIndex.value = null
-  }
-}
-
-// query parameter로 받은 mealType이 있으면 초기값으로 설정
-onMounted(() => {
-  if (route.query.mealType) {
-    mealType.value = route.query.mealType
-  }
-  // 외부 클릭 이벤트 리스너 등록
-  document.addEventListener('click', handleClickOutside)
+// 폼 유효성 검증
+const isFormValid = computed(() => {
+  return formData.value.title.trim() !== '' &&
+         formData.value.content.trim() !== '' &&
+         formData.value.startDate !== null &&
+         formData.value.endDate !== null
 })
 
-onUnmounted(() => {
-  // 외부 클릭 이벤트 리스너 해제
-  document.removeEventListener('click', handleClickOutside)
+// 날짜 유효성 검증
+const isDateRangeValid = computed(() => {
+  if (!formData.value.startDate || !formData.value.endDate) return true
+  return new Date(formData.value.startDate) <= new Date(formData.value.endDate)
 })
-
-const addFood = () => {
-  foods.value.push({ name: '', amount: 100, unit: 'g', caloriePerG: 0, caloriePerMl: 0 })
-}
-
-const removeFood = (index) => {
-  foods.value.splice(index, 1)
-  if (activeFoodIndex.value === index) {
-    showAutocomplete.value = false
-    activeFoodIndex.value = null
-  }
-}
-
-// 칼로리 계산 함수
-const calculateCalorie = (food) => {
-  if (!food.amount || food.amount <= 0) return 0
-
-  if (food.unit === 'g' && food.caloriePerG) {
-    return Number(((food.amount / 100) * food.caloriePerG).toFixed(2))
-  } else if (food.unit === 'ml' && food.caloriePerMl) {
-    return Number(((food.amount / 100) * food.caloriePerMl).toFixed(2))
-  }
-
-  return 0
-}
-
-// 총 칼로리 계산
-const totalCalories = computed(() => {
-  const total = foods.value.reduce((sum, food) => {
-    return sum + calculateCalorie(food)
-  }, 0)
-  return Number(total.toFixed(2))
-})
-
-// 음식 검색 API 호출
-const searchFood = async (query, index) => {
-  if (!query || query.trim() === '') {
-    searchResults.value = []
-    showAutocomplete.value = false
-    networkError.value = false
-    return
-  }
-
-  try {
-    const response = await axios.get(`http://localhost:8080/api/foods/search`, {
-      params: { name: query }
-    })
-    searchResults.value = response.data
-    activeFoodIndex.value = index
-    showAutocomplete.value = searchResults.value.length > 0
-    networkError.value = false
-  } catch (error) {
-    console.error('음식 검색 실패:', error)
-    searchResults.value = []
-    showAutocomplete.value = false
-    networkError.value = true
-    errorMessage.value = '네트워크 오류입니다'
-
-    // 3초 후 에러 메시지 자동 숨김
-    setTimeout(() => {
-      networkError.value = false
-    }, 3000)
-  }
-}
-
-// 음식명 입력 핸들러 (debounce 적용)
-const handleFoodNameInput = (event, index) => {
-  // 음식 선택 중이면 무시
-  if (isSelecting) return
-
-  const query = event.target.value
-
-  // 이전 타이머 취소
-  if (searchTimeout) {
-    clearTimeout(searchTimeout)
-  }
-
-  // 300ms 후에 검색 실행
-  searchTimeout = setTimeout(() => {
-    searchFood(query, index)
-  }, 300)
-}
-
-// 자동완성에서 음식 선택
-const selectFood = (food, index) => {
-  isSelecting = true
-
-  foods.value[index].name = food.name
-  foods.value[index].caloriePerG = food.caloriePerG || 0
-  foods.value[index].caloriePerMl = food.caloriePerMl || 0
-
-  // 사용 가능한 단위로 자동 설정
-  if (food.caloriePerG) {
-    foods.value[index].unit = 'g'
-  } else if (food.caloriePerMl) {
-    foods.value[index].unit = 'ml'
-  }
-
-  showAutocomplete.value = false
-  searchResults.value = []
-  activeFoodIndex.value = null
-
-  // 100ms 후 플래그 해제
-  setTimeout(() => {
-    isSelecting = false
-  }, 100)
-}
-
-// input focus 핸들러
-const handleFoodNameFocus = (index) => {
-  activeFoodIndex.value = index
-  if (foods.value[index].name && searchResults.value.length > 0) {
-    showAutocomplete.value = true
-  }
-}
 
 const displayToast = (message) => {
   toastMessage.value = message
@@ -177,11 +74,64 @@ const displayToast = (message) => {
   }, 3000)
 }
 
-const handleSubmit = () => {
-  displayToast('식단이 추가되었습니다!')
-  setTimeout(() => {
-    router.push('/diet')
-  }, 500)
+const handleSubmit = async () => {
+  if (!isFormValid.value) {
+    displayToast('모든 필드를 입력해주세요')
+    return
+  }
+
+  if (!isDateRangeValid.value) {
+    displayToast('종료일은 시작일 이후여야 합니다')
+    return
+  }
+
+  isSubmitting.value = true
+  networkError.value = false
+
+  try {
+    const requestData = {
+      title: formData.value.title,
+      content: formData.value.content,
+      startDate: formatDateForAPI(formData.value.startDate),
+      endDate: formatDateForAPI(formData.value.endDate)
+    }
+
+    const response = await axios.post('http://localhost:8080/api/diet-plans', requestData)
+
+    displayToast('식단 계획이 생성되었습니다!')
+
+    // Location header에서 생성된 ID 추출
+    const locationHeader = response.headers.location
+    let dietPlanId = null
+
+    if (locationHeader) {
+      // Location: /api/diet-plans/{id} 형식에서 ID 추출
+      const matches = locationHeader.match(/\/(\d+)$/)
+      if (matches) {
+        dietPlanId = matches[1]
+      }
+    }
+
+    // 0.5초 후 상세 페이지로 이동
+    setTimeout(() => {
+      if (dietPlanId) {
+        router.push(`/diet/edit?id=${dietPlanId}`)
+      } else {
+        router.push('/diet')
+      }
+    }, 500)
+  } catch (error) {
+    console.error('식단 계획 생성 실패:', error)
+    networkError.value = true
+    errorMessage.value = error.response?.data?.message || '네트워크 오류입니다'
+
+    // 3초 후 에러 메시지 자동 숨김
+    setTimeout(() => {
+      networkError.value = false
+    }, 3000)
+  } finally {
+    isSubmitting.value = false
+  }
 }
 
 const handleCancel = () => {
@@ -190,39 +140,15 @@ const handleCancel = () => {
 </script>
 
 <template>
-  <div class="add-diet-container">
+  <div class="add-diet-plan-container">
     <!-- 상단 네비게이션 -->
-    <header class="header">
-      <div class="header-content">
-        <div class="logo" @click="router.push('/main')">
-          <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <circle cx="20" cy="20" r="18" stroke="#4CAF50" stroke-width="2"/>
-            <path d="M13 20 L18 25 L28 14" stroke="#4CAF50" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-          <span class="logo-text">냠냠 코치</span>
-        </div>
-
-        <nav class="nav-menu">
-          <router-link to="/main" class="nav-item">대시보드</router-link>
-          <router-link to="/diet" class="nav-item active">식단 관리</router-link>
-          <router-link to="/board" class="nav-item">게시판</router-link>
-          <router-link to="/challenge" class="nav-item">챌린지</router-link>
-          <router-link to="/friends" class="nav-item">친구 검색</router-link>
-          <router-link to="/mypage" class="nav-item">마이페이지</router-link>
-        </nav>
-
-        <div class="user-menu">
-          <span class="username">홍길동님</span>
-          <button @click="router.push('/login')" class="logout-btn">로그아웃</button>
-        </div>
-      </div>
-    </header>
+    <AppHeader active-page="diet" />
 
     <!-- 메인 콘텐츠 -->
     <main class="main-content">
       <div class="content-wrapper">
         <div class="page-header">
-          <h1 class="page-title">식단 추가</h1>
+          <h1 class="page-title">새 식단 계획</h1>
         </div>
 
         <div class="form-card">
@@ -232,124 +158,85 @@ const handleCancel = () => {
           </div>
 
           <form @submit.prevent="handleSubmit">
-            <!-- 식사 타입 선택 -->
+            <!-- 제목 입력 -->
             <div class="form-section">
-              <label class="form-label">식사 시간</label>
-              <div class="meal-type-buttons">
-                <button
-                  v-for="type in ['아침', '점심', '저녁', '간식']"
-                  :key="type"
-                  type="button"
-                  :class="['meal-type-btn', { active: mealType === type }]"
-                  @click="mealType = type"
-                >
-                  {{ type }}
-                </button>
-              </div>
+              <label class="form-label">제목</label>
+              <input
+                v-model="formData.title"
+                type="text"
+                placeholder="예: 1월 다이어트 식단"
+                class="form-input"
+                required
+                maxlength="100"
+              />
             </div>
 
-            <!-- 음식 목록 -->
+            <!-- 내용 입력 -->
             <div class="form-section">
-              <div class="section-header">
-                <label class="form-label">음식 정보</label>
-                <button type="button" class="add-food-btn" @click="addFood">
-                  + 음식 추가
-                </button>
-              </div>
+              <label class="form-label">내용</label>
+              <textarea
+                v-model="formData.content"
+                placeholder="식단 계획에 대한 설명을 입력해주세요"
+                class="form-textarea"
+                required
+                rows="5"
+                maxlength="500"
+              ></textarea>
+            </div>
 
-              <div class="food-list">
-                <div v-for="(food, index) in foods" :key="index" class="food-row">
-                  <div class="food-input-group autocomplete-wrapper">
-                    <input
-                      v-model="food.name"
-                      type="text"
-                      placeholder="음식명 (예: 현미밥)"
-                      class="food-input"
-                      required
-                      @input="handleFoodNameInput($event, index)"
-                      @focus="handleFoodNameFocus(index)"
-                    />
-                    <!-- 자동완성 드롭다운 -->
-                    <div
-                      v-if="showAutocomplete && activeFoodIndex === index"
-                      class="autocomplete-dropdown"
-                    >
-                      <div
-                        v-for="(result, idx) in searchResults"
-                        :key="idx"
-                        class="autocomplete-item"
-                        @mousedown="selectFood(result, index)"
-                      >
-                        <div class="food-name">{{ result.name }}</div>
-                        <div class="food-calorie-info">
-                          <span v-if="result.caloriePerG">{{ result.caloriePerG }}kcal/100g</span>
-                          <span v-if="result.caloriePerG && result.caloriePerMl"> · </span>
-                          <span v-if="result.caloriePerMl">{{ result.caloriePerMl }}kcal/100ml</span>
-                        </div>
-                      </div>
-                      <div v-if="searchResults.length === 0" class="no-results">
-                        검색 결과가 없습니다
-                      </div>
-                    </div>
-                  </div>
-                  <div class="food-input-group amount-input-group">
-                    <input
-                      v-model.number="food.amount"
-                      type="number"
-                      placeholder="양"
-                      class="food-input amount-input"
-                      required
-                      min="0"
-                    />
-                    <select
-                      v-model="food.unit"
-                      class="unit-select"
-                    >
-                      <option
-                        v-for="unit in unitOptions"
-                        :key="unit"
-                        :value="unit"
-                        :disabled="(unit === 'g' && !food.caloriePerG) || (unit === 'ml' && !food.caloriePerMl)"
-                      >
-                        {{ unit }}
-                      </option>
-                    </select>
-                  </div>
-                  <div class="food-input-group calorie-input-group">
-                    <input
-                      :value="calculateCalorie(food)"
-                      type="number"
-                      placeholder="칼로리"
-                      class="food-input calorie-input"
-                      readonly
-                    />
-                    <span class="calorie-unit">kcal</span>
-                  </div>
-                  <button
-                    v-if="foods.length > 1"
-                    type="button"
-                    class="remove-btn"
-                    @click="removeFood(index)"
-                  >
-                    ✕
-                  </button>
+            <!-- 날짜 범위 입력 -->
+            <div class="form-section">
+              <label class="form-label">기간</label>
+              <div class="date-range-inputs">
+                <div class="date-input-group">
+                  <label class="date-label">시작일</label>
+                  <VueDatePicker
+                    v-model="formData.startDate"
+                    :enable-time-picker="false"
+                    placeholder="시작일"
+                    auto-apply
+                    :format="formatDateDisplay"
+                    model-type="yyyy-MM-dd"
+                    class="custom-datepicker"
+                  />
+                </div>
+                <span class="date-separator">~</span>
+                <div class="date-input-group">
+                  <label class="date-label">종료일</label>
+                  <VueDatePicker
+                    v-model="formData.endDate"
+                    :enable-time-picker="false"
+                    placeholder="종료일"
+                    auto-apply
+                    :format="formatDateDisplay"
+                    model-type="yyyy-MM-dd"
+                    :min-date="formData.startDate"
+                    class="custom-datepicker"
+                  />
                 </div>
               </div>
-
-              <!-- 총 칼로리 -->
-              <div class="total-calories">
-                <span class="total-label">총 칼로리</span>
-                <span class="total-value">{{ totalCalories }} kcal</span>
-              </div>
+              <p v-if="!isDateRangeValid" class="error-text">
+                종료일은 시작일 이후여야 합니다
+              </p>
             </div>
 
             <!-- 버튼 -->
             <div class="form-actions">
-              <button type="button" class="cancel-btn" @click="handleCancel">
+              <button
+                type="button"
+                class="cancel-btn"
+                @click="handleCancel"
+                :disabled="isSubmitting"
+              >
                 취소
               </button>
-              <button type="submit" class="submit-btn">
-                식단 추가
+              <button
+                type="submit"
+                class="submit-btn"
+                :disabled="!isFormValid || !isDateRangeValid || isSubmitting"
+                :class="{ disabled: !isFormValid || !isDateRangeValid || isSubmitting }"
+              >
+                {{ isSubmitting ? '생성 중...' : '생성' }}
               </button>
             </div>
           </form>
@@ -366,88 +253,9 @@ const handleCancel = () => {
 </template>
 
 <style scoped>
-.add-diet-container {
+.add-diet-plan-container {
   min-height: 100vh;
   background-color: #F5F7FA;
-}
-
-/* 헤더 */
-.header {
-  background: #FFFFFF;
-  border-bottom: 1px solid #E0E0E0;
-  position: sticky;
-  top: 0;
-  z-index: 100;
-}
-
-.header-content {
-  max-width: 1400px;
-  margin: 0 auto;
-  padding: 16px 40px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.logo {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  cursor: pointer;
-}
-
-.logo-text {
-  font-size: 20px;
-  font-weight: 700;
-  color: #333333;
-}
-
-.nav-menu {
-  display: flex;
-  gap: 32px;
-}
-
-.nav-item {
-  color: #666666;
-  text-decoration: none;
-  font-weight: 500;
-  transition: color 0.3s ease;
-  padding: 8px 0;
-  border-bottom: 2px solid transparent;
-}
-
-.nav-item:hover,
-.nav-item.active {
-  color: #4CAF50;
-  border-bottom-color: #4CAF50;
-}
-
-.user-menu {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-.username {
-  font-size: 14px;
-  color: #333333;
-  font-weight: 500;
-}
-
-.logout-btn {
-  padding: 8px 16px;
-  background: transparent;
-  border: 1px solid #E0E0E0;
-  border-radius: 6px;
-  color: #666666;
-  font-size: 14px;
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.logout-btn:hover {
-  border-color: #4CAF50;
-  color: #4CAF50;
 }
 
 /* 메인 콘텐츠 */
@@ -456,7 +264,7 @@ const handleCancel = () => {
 }
 
 .content-wrapper {
-  max-width: 900px;
+  max-width: 800px;
   margin: 0 auto;
 }
 
@@ -512,251 +320,143 @@ const handleCancel = () => {
   font-size: 16px;
   font-weight: 700;
   color: #333333;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
 }
 
-.section-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 16px;
-}
-
-/* 식사 타입 버튼 */
-.meal-type-buttons {
-  display: flex;
-  gap: 12px;
-}
-
-.meal-type-btn {
-  flex: 1;
-  padding: 14px;
-  background: #F8F9FA;
-  border: 2px solid #E0E0E0;
-  border-radius: 8px;
-  font-size: 15px;
-  font-weight: 600;
-  color: #666666;
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.meal-type-btn:hover {
-  border-color: #4CAF50;
-  color: #4CAF50;
-}
-
-.meal-type-btn.active {
-  background: #E8F5E9;
-  border-color: #4CAF50;
-  color: #4CAF50;
-}
-
-/* 음식 추가 버튼 */
-.add-food-btn {
-  padding: 8px 16px;
-  background: #4CAF50;
-  color: #FFFFFF;
-  border: none;
-  border-radius: 6px;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.3s ease;
-}
-
-.add-food-btn:hover {
-  background: #45A049;
-}
-
-/* 음식 목록 */
-.food-list {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-/* 총 칼로리 */
-.total-calories {
-  margin-top: 24px;
-  padding: 16px 20px;
-  background: #F5F7FA;
-  border-radius: 8px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  border: 2px solid #E8F5E9;
-}
-
-.total-label {
-  font-size: 16px;
-  font-weight: 700;
-  color: #333333;
-}
-
-.total-value {
-  font-size: 20px;
-  font-weight: 700;
-  color: #4CAF50;
-}
-
-.food-row {
-  display: grid;
-  grid-template-columns: 2fr 1.5fr 1fr auto;
-  gap: 12px;
-  align-items: center;
-}
-
-.food-input-group {
-  display: flex;
-  flex-direction: column;
-}
-
-.amount-input-group {
-  display: flex;
-  flex-direction: row;
-  gap: 8px;
-}
-
-.amount-input {
-  flex: 1;
-}
-
-.unit-select {
-  padding: 12px 8px;
-  border: 1px solid #E0E0E0;
-  border-radius: 8px;
-  font-size: 15px;
-  color: #333333;
-  background: #FFFFFF;
-  cursor: pointer;
-  transition: border-color 0.3s ease;
-  min-width: 60px;
-}
-
-.unit-select:focus {
-  outline: none;
-  border-color: #4CAF50;
-}
-
-.unit-select option:disabled {
-  color: #CCCCCC;
-  background: #F5F5F5;
-}
-
-.calorie-input-group {
-  display: flex;
-  flex-direction: row;
-  gap: 8px;
-  align-items: center;
-}
-
-.calorie-input {
-  flex: 1;
-}
-
-.calorie-unit {
-  font-size: 14px;
-  color: #666666;
-  font-weight: 600;
-  min-width: 40px;
-}
-
-.autocomplete-wrapper {
-  position: relative;
-}
-
-.food-input {
-  padding: 12px 16px;
+.form-input,
+.form-textarea {
+  width: 100%;
+  padding: 14px 16px;
   border: 1px solid #E0E0E0;
   border-radius: 8px;
   font-size: 15px;
   color: #333333;
   background: #FFFFFF;
   transition: border-color 0.3s ease;
+  font-family: inherit;
 }
 
-.food-input:focus {
+.form-input:focus,
+.form-textarea:focus {
   outline: none;
   border-color: #4CAF50;
 }
 
-.food-input::placeholder {
+.form-input::placeholder,
+.form-textarea::placeholder {
   color: #AAAAAA;
 }
 
-/* 자동완성 드롭다운 */
-.autocomplete-dropdown {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  right: 0;
-  max-height: 250px;
-  overflow-y: auto;
-  background: #FFFFFF;
+.form-textarea {
+  resize: vertical;
+  min-height: 120px;
+}
+
+/* 날짜 범위 입력 */
+.date-range-inputs {
+  display: flex;
+  align-items: flex-end;
+  gap: 16px;
+}
+
+.date-input-group {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.date-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #666666;
+}
+
+/* 커스텀 데이트피커 스타일 */
+.custom-datepicker {
+  width: 100%;
+}
+
+.custom-datepicker :deep(.dp__input_wrap) {
+  width: 100%;
+}
+
+.custom-datepicker :deep(.dp__input) {
+  padding: 14px 40px 14px 16px;
   border: 1px solid #E0E0E0;
   border-radius: 8px;
-  margin-top: 4px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  z-index: 1000;
-}
-
-.autocomplete-item {
-  padding: 12px 16px;
-  cursor: pointer;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  transition: background 0.2s ease;
-  border-bottom: 1px solid #F5F5F5;
-}
-
-.autocomplete-item:last-child {
-  border-bottom: none;
-}
-
-.autocomplete-item:hover {
-  background: #F5F7FA;
-}
-
-.food-name {
   font-size: 15px;
   color: #333333;
-  font-weight: 500;
-}
-
-.food-calorie-info {
-  font-size: 12px;
-  color: #4CAF50;
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-.no-results {
-  padding: 16px;
-  text-align: center;
-  color: #999999;
-  font-size: 14px;
-}
-
-.remove-btn {
-  width: 36px;
-  height: 36px;
-  background: #FFE0E0;
-  color: #F44336;
-  border: none;
-  border-radius: 6px;
-  font-size: 18px;
+  background: #FFFFFF;
   cursor: pointer;
-  transition: all 0.3s ease;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  transition: border-color 0.3s ease;
+  font-family: inherit;
+  width: 100%;
 }
 
-.remove-btn:hover {
-  background: #F44336;
+.custom-datepicker :deep(.dp__input::placeholder) {
+  color: #AAAAAA;
+}
+
+.custom-datepicker :deep(.dp__input:hover) {
+  border-color: #4CAF50;
+}
+
+.custom-datepicker :deep(.dp__input:focus) {
+  outline: none;
+  border-color: #4CAF50;
+}
+
+.custom-datepicker :deep(.dp__input_icon) {
+  right: 40px;
+  left: auto;
+  color: #666666;
+}
+
+.custom-datepicker :deep(.dp__input_icon svg) {
+  width: 20px;
+  height: 20px;
+}
+
+.custom-datepicker :deep(.dp__clear_icon) {
+  right: 12px;
+  left: auto;
+}
+
+.custom-datepicker :deep(.dp__action_buttons) {
+  display: none;
+}
+
+.custom-datepicker :deep(.dp__active_date) {
+  background-color: #4CAF50;
+}
+
+.custom-datepicker :deep(.dp__today) {
+  border-color: #4CAF50;
+}
+
+.custom-datepicker :deep(.dp__cell_inner.dp__active_date) {
+  background: #4CAF50;
   color: #FFFFFF;
+}
+
+.custom-datepicker :deep(.dp__cell_inner:hover) {
+  background: #E8F5E9;
+  color: #4CAF50;
+}
+
+.date-separator {
+  font-size: 18px;
+  font-weight: 600;
+  color: #666666;
+  padding-bottom: 14px;
+}
+
+.error-text {
+  margin-top: 8px;
+  font-size: 14px;
+  color: #F44336;
+  font-weight: 500;
 }
 
 /* 액션 버튼 */
@@ -783,9 +483,14 @@ const handleCancel = () => {
   color: #666666;
 }
 
-.cancel-btn:hover {
+.cancel-btn:hover:not(:disabled) {
   border-color: #333333;
   color: #333333;
+}
+
+.cancel-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .submit-btn {
@@ -794,10 +499,17 @@ const handleCancel = () => {
   color: #FFFFFF;
 }
 
-.submit-btn:hover {
+.submit-btn:hover:not(:disabled) {
   background: #45A049;
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
+}
+
+.submit-btn.disabled {
+  background: #CCCCCC;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
 }
 
 /* 토스트 메시지 */
@@ -849,16 +561,30 @@ const handleCancel = () => {
 
 /* 반응형 */
 @media (max-width: 768px) {
-  .food-row {
-    grid-template-columns: 1fr;
+  .main-content {
+    padding: 20px;
   }
 
-  .remove-btn {
-    width: 100%;
+  .form-card {
+    padding: 24px;
   }
 
-  .meal-type-buttons {
+  .date-range-inputs {
     flex-direction: column;
+    align-items: stretch;
+  }
+
+  .date-separator {
+    display: none;
+  }
+
+  .form-actions {
+    flex-direction: column;
+  }
+
+  .cancel-btn,
+  .submit-btn {
+    width: 100%;
   }
 
   .toast-message {

@@ -1,50 +1,70 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import axios from 'axios'
 import AppHeader from '@/components/AppHeader.vue'
 
 const router = useRouter()
 
-// 더미 데이터 - 식단 계획 목록
-const dietPlans = ref([
-  {
-    id: 1,
-    title: '1월 다이어트 식단',
-    startDate: '2025-01-01',
-    endDate: '2025-01-31',
-    isShared: false
-  },
-  {
-    id: 2,
-    title: '저탄수화물 식단',
-    startDate: '2024-12-15',
-    endDate: '2025-01-15',
-    isShared: true
-  },
-])
+// 식단 계획 목록
+const dietPlans = ref([])
 
-const selectedPlan = ref(dietPlans.value[0])
-const selectedDate = ref('2025-01-15')
+// 로딩 및 에러 상태
+const isLoading = ref(true)
+const networkError = ref(false)
 
-// 날짜 변경 함수
-const changeDate = (days) => {
-  const currentDate = new Date(selectedDate.value)
-  currentDate.setDate(currentDate.getDate() + days)
-  selectedDate.value = currentDate.toISOString().split('T')[0]
+// 식단 계획 목록 가져오기
+const fetchDietPlans = async () => {
+  isLoading.value = true
+  networkError.value = false
+
+  try {
+    const response = await axios.get('http://localhost:8080/api/diet-plans/my')
+    dietPlans.value = response.data.map(plan => ({
+      id: plan.dietPlanId,
+      title: plan.title,
+      startDate: plan.startDate,
+      endDate: plan.endDate
+    }))
+  } catch (error) {
+    console.error('식단 계획 조회 실패:', error)
+    networkError.value = true
+  } finally {
+    isLoading.value = false
+  }
 }
 
-// 더미 데이터 - 일별 식단
-const dailyDiet = ref({
-  breakfast: [
-    { name: '현미밥', amount: '1공기', calorie: 300 },
-    { name: '계란후라이', amount: '1개', calorie: 90 },
-  ],
-  lunch: [
-    { name: '샐러드', amount: '1접시', calorie: 150 },
-    { name: '닭가슴살', amount: '100g', calorie: 165 },
-  ],
-  dinner: [],
-  snack: []
+// 식단 계획 상세 페이지로 이동
+const goToDietPlanDetail = (planId) => {
+  router.push(`/diet/edit?id=${planId}`)
+}
+
+// 새 식단 계획 추가
+const goToAddDietPlan = () => {
+  router.push('/diet/add')
+}
+
+// 날짜 포맷팅
+const formatDate = (dateStr) => {
+  if (!dateStr) return ''
+  const date = new Date(dateStr)
+  const year = date.getFullYear()
+  const month = date.getMonth() + 1
+  const day = date.getDate()
+  return `${year}.${month}.${day}`
+}
+
+// 기간 계산 (며칠 동안)
+const calculateDuration = (startDate, endDate) => {
+  const start = new Date(startDate)
+  const end = new Date(endDate)
+  const diffTime = Math.abs(end - start)
+  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1
+  return `${diffDays}일`
+}
+
+onMounted(() => {
+  fetchDietPlans()
 })
 </script>
 
@@ -58,120 +78,69 @@ const dailyDiet = ref({
       <div class="content-wrapper">
         <div class="page-header">
           <h1 class="page-title">식단 관리</h1>
-          <button class="create-btn" @click="router.push('/diet/add')">+ 새 식단 계획</button>
         </div>
 
-        <div class="diet-layout">
-          <!-- 왼쪽: 식단 계획 목록 -->
-          <div class="plan-list-section">
-            <div class="section-title">내 식단 계획</div>
-            <div class="plan-list">
-              <div
-                v-for="plan in dietPlans"
-                :key="plan.id"
-                :class="['plan-item', { active: selectedPlan.id === plan.id }]"
-                @click="selectedPlan = plan"
-              >
-                <div class="plan-header">
-                  <h3 class="plan-title">{{ plan.title }}</h3>
-                  <span v-if="plan.isShared" class="shared-badge">공유됨</span>
-                </div>
-                <p class="plan-period">{{ plan.startDate }} ~ {{ plan.endDate }}</p>
+        <!-- 로딩 중 -->
+        <div v-if="isLoading" class="loading-message">
+          로딩 중...
+        </div>
+
+        <!-- 네트워크 오류 -->
+        <div v-else-if="networkError" class="error-state">
+          <div class="error-icon">⚠</div>
+          <p class="error-text">네트워크 오류입니다</p>
+          <p class="error-subtext">잠시 후 시도해주세요</p>
+          <button class="retry-btn" @click="fetchDietPlans">다시 시도</button>
+        </div>
+
+        <!-- 빈 리스트 -->
+        <div v-else-if="dietPlans.length === 0" class="empty-state">
+          <div class="empty-icon">📋</div>
+          <p class="empty-text">아직 식단 계획이 없습니다</p>
+          <p class="empty-subtext">새로운 식단 계획을 작성해보세요</p>
+          <button class="create-btn-large" @click="goToAddDietPlan">
+            + 새 식단 계획
+          </button>
+        </div>
+
+        <!-- 식단 계획 목록 -->
+        <div v-else class="plan-grid">
+          <!-- 식단 계획 카드들 -->
+          <div
+            v-for="plan in dietPlans"
+            :key="plan.id"
+            class="plan-card"
+            @click="goToDietPlanDetail(plan.id)"
+          >
+            <div class="plan-card-header">
+              <h3 class="plan-card-title">{{ plan.title }}</h3>
+            </div>
+            <div class="plan-card-body">
+              <div class="plan-info-row">
+                <span class="info-label">기간</span>
+                <span class="info-value">{{ calculateDuration(plan.startDate, plan.endDate) }}</span>
               </div>
+              <div class="plan-info-row">
+                <span class="info-label">시작일</span>
+                <span class="info-value">{{ formatDate(plan.startDate) }}</span>
+              </div>
+              <div class="plan-info-row">
+                <span class="info-label">종료일</span>
+                <span class="info-value">{{ formatDate(plan.endDate) }}</span>
+              </div>
+            </div>
+            <div class="plan-card-footer">
+              <button class="detail-btn" @click.stop="goToDietPlanDetail(plan.id)">
+                상세보기 →
+              </button>
             </div>
           </div>
 
-          <!-- 오른쪽: 식단 상세 -->
-          <div class="plan-detail-section">
-            <div class="detail-header">
-              <h2 class="detail-title">{{ selectedPlan.title }}</h2>
-              <div class="detail-actions">
-                <button class="action-btn delete">삭제</button>
-              </div>
-            </div>
-
-            <!-- 날짜 선택 -->
-            <div class="date-selector">
-              <button class="date-nav-btn" @click="changeDate(-1)">◀</button>
-              <input type="date" v-model="selectedDate" class="date-input" />
-              <button class="date-nav-btn" @click="changeDate(1)">▶</button>
-            </div>
-
-            <!-- 식단 카드 -->
-            <div class="meal-cards">
-              <!-- 아침 -->
-              <div class="meal-card">
-                <div class="meal-card-header">
-                  <h3 class="meal-card-title">아침</h3>
-                  <button v-if="dailyDiet.breakfast.length > 0" class="meal-edit-btn" @click="router.push('/diet/edit?mealType=아침')">수정</button>
-                </div>
-                <div class="meal-card-content">
-                  <div v-if="dailyDiet.breakfast.length === 0" class="empty-meal-card">
-                    <button class="meal-add-btn-large" @click="router.push('/diet/add?mealType=아침')">+ 식단 추가</button>
-                  </div>
-                  <div v-else class="food-items">
-                    <div v-for="food in dailyDiet.breakfast" :key="food.name" class="food-item">
-                      <div class="food-info">
-                        <span class="food-name">{{ food.name }}</span>
-                        <span class="food-amount">{{ food.amount }}</span>
-                      </div>
-                      <span class="food-calorie">{{ food.calorie }}kcal</span>
-                    </div>
-                    <div class="meal-total">
-                      총 {{ dailyDiet.breakfast.reduce((sum, food) => sum + food.calorie, 0) }}kcal
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <!-- 점심 -->
-              <div class="meal-card">
-                <div class="meal-card-header">
-                  <h3 class="meal-card-title">점심</h3>
-                  <button v-if="dailyDiet.lunch.length > 0" class="meal-edit-btn" @click="router.push('/diet/edit?mealType=점심')">수정</button>
-                </div>
-                <div class="meal-card-content">
-                  <div v-if="dailyDiet.lunch.length === 0" class="empty-meal-card">
-                    <button class="meal-add-btn-large" @click="router.push('/diet/add?mealType=점심')">+ 식단 추가</button>
-                  </div>
-                  <div v-else class="food-items">
-                    <div v-for="food in dailyDiet.lunch" :key="food.name" class="food-item">
-                      <div class="food-info">
-                        <span class="food-name">{{ food.name }}</span>
-                        <span class="food-amount">{{ food.amount }}</span>
-                      </div>
-                      <span class="food-calorie">{{ food.calorie }}kcal</span>
-                    </div>
-                    <div class="meal-total">
-                      총 {{ dailyDiet.lunch.reduce((sum, food) => sum + food.calorie, 0) }}kcal
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <!-- 저녁 -->
-              <div class="meal-card">
-                <div class="meal-card-header">
-                  <h3 class="meal-card-title">저녁</h3>
-                </div>
-                <div class="meal-card-content">
-                  <div class="empty-meal-card">
-                    <button class="meal-add-btn-large" @click="router.push('/diet/add?mealType=저녁')">+ 식단 추가</button>
-                  </div>
-                </div>
-              </div>
-
-              <!-- 간식 -->
-              <div class="meal-card">
-                <div class="meal-card-header">
-                  <h3 class="meal-card-title">간식</h3>
-                </div>
-                <div class="meal-card-content">
-                  <div class="empty-meal-card">
-                    <button class="meal-add-btn-large" @click="router.push('/diet/add?mealType=간식')">+ 식단 추가</button>
-                  </div>
-                </div>
-              </div>
+          <!-- 새 식단 계획 추가 카드 -->
+          <div class="plan-card add-card" @click="goToAddDietPlan">
+            <div class="add-card-content">
+              <div class="add-icon">+</div>
+              <p class="add-text">새 식단 계획</p>
             </div>
           </div>
         </div>
@@ -192,14 +161,11 @@ const dailyDiet = ref({
 }
 
 .content-wrapper {
-  max-width: 1400px;
+  max-width: 1200px;
   margin: 0 auto;
 }
 
 .page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
   margin-bottom: 32px;
 }
 
@@ -209,346 +175,270 @@ const dailyDiet = ref({
   color: #333333;
 }
 
-.create-btn {
-  padding: 12px 24px;
+/* 로딩 메시지 */
+.loading-message {
+  text-align: center;
+  padding: 80px 20px;
+  font-size: 18px;
+  color: #666666;
+}
+
+/* 네트워크 오류 상태 */
+.error-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 80px 20px;
+  text-align: center;
+}
+
+.error-icon {
+  font-size: 64px;
+  margin-bottom: 24px;
+}
+
+.error-text {
+  font-size: 20px;
+  font-weight: 700;
+  color: #F44336;
+  margin-bottom: 8px;
+}
+
+.error-subtext {
+  font-size: 16px;
+  color: #666666;
+  margin-bottom: 32px;
+}
+
+.retry-btn {
+  padding: 12px 32px;
   background: #4CAF50;
   color: #FFFFFF;
   border: none;
   border-radius: 8px;
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.3s ease;
 }
 
-.create-btn:hover {
+.retry-btn:hover {
   background: #45A049;
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
 }
 
-/* 레이아웃 */
-.diet-layout {
-  display: grid;
-  grid-template-columns: 300px 1fr;
-  gap: 24px;
-}
-
-/* 식단 계획 목록 */
-.plan-list-section {
-  background: #FFFFFF;
-  border-radius: 12px;
-  padding: 24px;
-  height: fit-content;
-  position: sticky;
-  top: 80px;
-}
-
-.section-title {
-  font-size: 18px;
-  font-weight: 700;
-  color: #333333;
-  margin-bottom: 20px;
-}
-
-.plan-list {
+/* 빈 상태 */
+.empty-state {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-}
-
-.plan-item {
-  padding: 16px;
-  background: #F8F9FA;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  border: 2px solid transparent;
-}
-
-.plan-item:hover {
-  background: #E8F5E9;
-}
-
-.plan-item.active {
-  border-color: #4CAF50;
-  background: #E8F5E9;
-}
-
-.plan-header {
-  display: flex;
-  justify-content: space-between;
   align-items: center;
+  justify-content: center;
+  padding: 80px 20px;
+  text-align: center;
+}
+
+.empty-icon {
+  font-size: 64px;
+  margin-bottom: 24px;
+}
+
+.empty-text {
+  font-size: 20px;
+  font-weight: 700;
+  color: #333333;
   margin-bottom: 8px;
 }
 
-.plan-title {
-  font-size: 15px;
-  font-weight: 600;
-  color: #333333;
+.empty-subtext {
+  font-size: 16px;
+  color: #666666;
+  margin-bottom: 32px;
 }
 
-.shared-badge {
-  padding: 4px 8px;
-  background: #FFA726;
+.create-btn-large {
+  padding: 14px 32px;
+  background: #4CAF50;
   color: #FFFFFF;
-  border-radius: 4px;
-  font-size: 11px;
+  border: none;
+  border-radius: 8px;
+  font-size: 16px;
   font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
 }
 
-.plan-period {
+.create-btn-large:hover {
+  background: #45A049;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
+}
+
+/* 식단 계획 그리드 */
+.plan-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 24px;
+}
+
+/* 식단 계획 카드 */
+.plan-card {
+  background: #FFFFFF;
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  cursor: pointer;
+  transition: all 0.3s ease;
+  border: 2px solid transparent;
+  display: flex;
+  flex-direction: column;
+}
+
+.plan-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+  border-color: #4CAF50;
+}
+
+.plan-card-header {
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 2px solid #F0F0F0;
+}
+
+.plan-card-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: #333333;
+  margin: 0;
+}
+
+.plan-card-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.plan-info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.info-label {
   font-size: 14px;
   color: #666666;
   font-weight: 500;
 }
 
-/* 식단 상세 */
-.plan-detail-section {
-  background: #FFFFFF;
-  border-radius: 12px;
-  padding: 32px;
-}
-
-.detail-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 24px;
-  padding-bottom: 20px;
-  border-bottom: 2px solid #F0F0F0;
-}
-
-.detail-title {
-  font-size: 24px;
-  font-weight: 700;
-  color: #333333;
-}
-
-.detail-actions {
-  display: flex;
-  gap: 12px;
-}
-
-.action-btn {
-  padding: 8px 16px;
-  background: transparent;
-  border: 1px solid #E0E0E0;
-  border-radius: 6px;
-  color: #666666;
-  font-size: 14px;
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.action-btn:hover {
-  border-color: #4CAF50;
-  color: #4CAF50;
-}
-
-.action-btn.delete:hover {
-  border-color: #F44336;
-  color: #F44336;
-}
-
-/* 날짜 선택 */
-.date-selector {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 32px;
-  justify-content: center;
-}
-
-.date-nav-btn {
-  width: 36px;
-  height: 36px;
-  background: #FFFFFF;
-  border: 1px solid #E0E0E0;
-  border-radius: 6px;
-  color: #666666;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  font-size: 14px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.date-nav-btn:hover {
-  background: #4CAF50;
-  color: #FFFFFF;
-  border-color: #4CAF50;
-}
-
-.date-input {
-  padding: 8px 16px;
-  border: 1px solid #E0E0E0;
-  border-radius: 6px;
+.info-value {
   font-size: 15px;
   color: #333333;
-  background: #FFFFFF;
-  cursor: pointer;
-  transition: border-color 0.3s ease;
   font-weight: 600;
+}
+
+.plan-card-footer {
   display: flex;
-  align-items: center;
-  text-align: center;
+  justify-content: flex-end;
 }
 
-.date-input:focus {
-  outline: none;
-  border-color: #4CAF50;
-}
-
-/* 식단 카드 */
-.meal-cards {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 20px;
-}
-
-.meal-card {
-  background: #F8F9FA;
-  border-radius: 10px;
-  padding: 20px;
-}
-
-.meal-card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 16px;
-}
-
-.meal-card-title {
-  font-size: 18px;
-  font-weight: 700;
+.detail-btn {
+  padding: 8px 16px;
+  background: #E8F5E9;
   color: #4CAF50;
-}
-
-.meal-edit-btn {
-  padding: 6px 12px;
-  background: transparent;
-  border: 1px solid #4CAF50;
+  border: none;
   border-radius: 6px;
-  color: #4CAF50;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.meal-edit-btn:hover {
-  background: #4CAF50;
-  color: #FFFFFF;
-}
-
-.meal-add-btn-small {
-  padding: 6px 12px;
-  background: transparent;
-  border: 1px solid #4CAF50;
-  border-radius: 6px;
-  color: #4CAF50;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.meal-add-btn-small:hover {
-  background: #4CAF50;
-  color: #FFFFFF;
-}
-
-.meal-card-content {
-  min-height: 120px;
-}
-
-.empty-meal-card {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 120px;
-}
-
-.meal-add-btn-large {
-  padding: 12px 24px;
-  background: #FFFFFF;
-  border: 2px dashed #4CAF50;
-  border-radius: 8px;
-  color: #4CAF50;
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.3s ease;
 }
 
-.meal-add-btn-large:hover {
+.detail-btn:hover {
+  background: #4CAF50;
+  color: #FFFFFF;
+}
+
+/* 새 식단 계획 추가 카드 */
+.add-card {
+  background: #FFFFFF;
+  border: 2px dashed #4CAF50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 240px;
+}
+
+.add-card:hover {
   background: #E8F5E9;
   border-style: solid;
 }
 
-.food-items {
+.add-card-content {
   display: flex;
   flex-direction: column;
+  align-items: center;
   gap: 12px;
 }
 
-.food-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 12px;
-  background: #FFFFFF;
-  border-radius: 6px;
+.add-icon {
+  font-size: 48px;
+  color: #4CAF50;
+  font-weight: 300;
 }
 
-.food-info {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.food-name {
-  font-size: 14px;
-  font-weight: 600;
-  color: #333333;
-}
-
-.food-amount {
-  font-size: 12px;
-  color: #888888;
-}
-
-.food-calorie {
-  font-size: 14px;
+.add-text {
+  font-size: 16px;
   font-weight: 600;
   color: #4CAF50;
-}
-
-.meal-total {
-  margin-top: 8px;
-  padding-top: 12px;
-  border-top: 1px solid #E0E0E0;
-  text-align: right;
-  font-size: 15px;
-  font-weight: 700;
-  color: #333333;
+  margin: 0;
 }
 
 /* 반응형 */
-@media (max-width: 968px) {
-  .diet-layout {
+@media (max-width: 768px) {
+  .main-content {
+    padding: 20px;
+  }
+
+  .page-title {
+    font-size: 24px;
+  }
+
+  .plan-grid {
     grid-template-columns: 1fr;
   }
 
-  .plan-list-section {
-    position: static;
+  .error-state,
+  .empty-state {
+    padding: 60px 20px;
   }
 
-  .meal-cards {
-    grid-template-columns: 1fr;
+  .error-icon,
+  .empty-icon {
+    font-size: 48px;
+  }
+
+  .error-text,
+  .empty-text {
+    font-size: 18px;
+  }
+
+  .error-subtext,
+  .empty-subtext {
+    font-size: 14px;
+  }
+}
+
+@media (max-width: 480px) {
+  .plan-card {
+    padding: 20px;
+  }
+
+  .plan-card-title {
+    font-size: 18px;
   }
 }
 </style>
