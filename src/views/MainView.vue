@@ -1,9 +1,21 @@
 <script setup>
-import { ref } from 'vue'
+import { ref , onMounted} from 'vue'
 import { useRouter } from 'vue-router'
 import AppHeader from '@/components/AppHeader.vue'
 
 const router = useRouter()
+
+const nickname = ref('게스트')
+// 페이지가 열릴 때(마운트 될 때) 로컬 스토리지에서 꺼내오기
+onMounted(() => {
+  const storedNickname = localStorage.getItem('nickname')
+  if (storedNickname) {
+    nickname.value = storedNickname
+  } else {
+    // 만약 닉네임이 없으면(비로그인 상태 등) 로그인 페이지로 튕기게 할 수도 있어
+    nickname.value = '게스트' 
+  }
+})
 
 // 더미 데이터
 const todayMeals = ref([
@@ -44,7 +56,7 @@ const recentPosts = ref([
       <div class="content-wrapper">
         <!-- 환영 메시지 -->
         <div class="welcome-section">
-          <h1 class="welcome-title">안녕하세요, 홍길동님! 👋</h1>
+          <h1 class="welcome-title">안녕하세요, {{nickname}}님! 👋</h1>
           <p class="welcome-subtitle">오늘도 건강한 하루 되세요</p>
         </div>
 
