@@ -1,7 +1,7 @@
 <script setup>
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
-import axios from 'axios' // 1. axios 불러오기
+import axios from '@/util/axios' // 1. axios 불러오기
 
 const router = useRouter()
 
