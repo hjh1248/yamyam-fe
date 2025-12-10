@@ -1,21 +1,55 @@
 <script setup>
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
+import axios from 'axios' // 1. axios 임포트
 
 const router = useRouter()
 const email = ref('')
 const password = ref('')
 const errorMessage = ref('')
 
-const handleLogin = () => {
+// 비동기 처리(async)를 위해 함수 수정
+const handleLogin = async () => {
   // 에러 메시지 초기화
   errorMessage.value = ''
 
-  // 더미 데이터로 로그인 체크
-  if (email.value === 'test@yamyam.com' && password.value === 'test1234') {
+  try {
+    // 2. 백엔드로 진짜 요청 보내기
+    // post('주소', { 보낼 데이터 })
+    const response = await axios.post('http://localhost:8080/api/users/login', {
+      email: email.value,
+      password: password.value
+    })
+
+    // 3. 성공 시 처리 (200 OK)
+    console.log('로그인 성공!', response.data)
+    
+    // 서버에서 받은 토큰과 닉네임 꺼내기
+    const { accessToken, nickname } = response.data
+
+    // 4. 중요! 토큰을 브라우저(로컬 스토리지)에 저장
+    // 나중에 다른 API 요청할 때 이 토큰을 꺼내서 써야 해.
+    localStorage.setItem('accessToken', accessToken)
+    localStorage.setItem('nickname', nickname)
+
+    // 환영 메시지 (선택 사항)
+    alert(`${nickname}님, 환영합니다! 🥗`)
+
+    // 메인 페이지로 이동
     router.push('/main')
-  } else {
-    errorMessage.value = '이메일 또는 비밀번호를 다시 입력해주세요'
+
+  } catch (error) {
+    // 5. 실패 시 처리 (400, 401, 500 에러 등)
+    console.error('로그인 실패:', error)
+
+    if (error.response) {
+      // 서버가 에러 메시지를 보낸 경우 (예: "비밀번호가 틀렸습니다")
+      // 백엔드에서 IllegalArgumentException 메시지가 넘어올 수도 있어 확인 필요
+      errorMessage.value = '이메일 또는 비밀번호를 확인해주세요.'
+    } else {
+      // 서버가 꺼져있거나 네트워크 문제인 경우
+      errorMessage.value = '서버와 통신할 수 없습니다.'
+    }
   }
 }
 </script>

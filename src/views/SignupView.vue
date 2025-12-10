@@ -1,6 +1,7 @@
 <script setup>
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
+import axios from 'axios' // 1. axios 불러오기
 
 const router = useRouter()
 
@@ -10,12 +11,6 @@ const password = ref('')
 const passwordConfirm = ref('')
 const nickname = ref('')
 const name = ref('')
-
-// 신체 정보
-const height = ref('')
-const weight = ref('')
-const age = ref('')
-const gender = ref('')
 
 // 토스트
 const showToast = ref(false)
@@ -29,30 +24,48 @@ const displayToast = (message) => {
   }, 3000)
 }
 
-const handleSignup = () => {
-  // 비밀번호 확인
+// async 키워드 추가 (비동기 통신을 위해)
+const handleSignup = async () => {
+  // 1. 비밀번호 확인 (프론트엔드 유효성 검사)
   if (password.value !== passwordConfirm.value) {
     displayToast('비밀번호가 일치하지 않습니다.')
     return
   }
 
-  // 더미 데이터로 회원가입 처리
-  const userData = {
-    email: email.value,
-    password: password.value,
-    nickname: nickname.value,
-    name: name.value,
-    height: parseInt(height.value),
-    weight: parseInt(weight.value),
-    age: parseInt(age.value),
-    gender: gender.value
-  }
+  try {
+    // 2. 백엔드로 회원가입 요청 보내기
+    // 주소: http://localhost:8080/api/users/signup
+    // 데이터: JoinRequest DTO 구조와 똑같이 맞춰야 해
+    const response = await axios.post('http://localhost:8080/api/users/signup', {
+      email: email.value,
+      password: password.value,
+      nickname: nickname.value,
+      name: name.value
+    })
 
-  console.log('회원가입 데이터:', userData)
-  displayToast('회원가입이 완료되었습니다!')
-  setTimeout(() => {
-    router.push('/login')
-  }, 500)
+    // 3. 성공 시 처리 (200 OK)
+    console.log('회원가입 성공:', response.data)
+    displayToast('회원가입이 완료되었습니다! 로그인해주세요.')
+
+    // 토스트 메시지를 볼 시간을 조금 주고 이동 (1.5초)
+    setTimeout(() => {
+      router.push('/login')
+    }, 1500)
+
+  } catch (error) {
+    // 4. 실패 시 처리 (중복 이메일 등)
+    console.error('회원가입 실패:', error)
+
+    if (error.response) {
+      // 백엔드에서 보낸 에러 메시지가 있다면 그걸 보여줌
+      // 예: "이미 존재하는 이메일입니다." (우리가 UserService에서 throw한 메시지)
+      // Spring Boot 설정에 따라 error.response.data 자체가 메시지일 수도 있고, 객체일 수도 있어.
+      const msg = error.response.data.message || error.response.data || '회원가입 중 오류가 발생했습니다.'
+      displayToast(msg)
+    } else {
+      displayToast('서버와 연결할 수 없습니다.')
+    }
+  }
 }
 </script>
 
@@ -138,55 +151,6 @@ const handleSignup = () => {
                 required
                 class="input-field"
               />
-            </div>
-          </div>
-
-          <!-- 신체 정보 -->
-          <div class="section-title">신체 정보</div>
-
-          <div class="input-row">
-            <div class="input-group">
-              <label class="input-label">키 (cm)</label>
-              <input
-                v-model="height"
-                type="number"
-                placeholder="170"
-                required
-                class="input-field"
-              />
-            </div>
-
-            <div class="input-group">
-              <label class="input-label">체중 (kg)</label>
-              <input
-                v-model="weight"
-                type="number"
-                placeholder="65"
-                required
-                class="input-field"
-              />
-            </div>
-          </div>
-
-          <div class="input-row">
-            <div class="input-group">
-              <label class="input-label">나이</label>
-              <input
-                v-model="age"
-                type="number"
-                placeholder="25"
-                required
-                class="input-field"
-              />
-            </div>
-
-            <div class="input-group">
-              <label class="input-label">성별</label>
-              <select v-model="gender" required class="input-field select-field">
-                <option value="" disabled selected>선택하세요</option>
-                <option value="남성">남성</option>
-                <option value="여성">여성</option>
-              </select>
             </div>
           </div>
 
@@ -351,15 +315,6 @@ const handleSignup = () => {
 
 .input-field:focus {
   border-bottom-color: #4CAF50;
-}
-
-.select-field {
-  cursor: pointer;
-  appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23333' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 0 center;
-  padding-right: 20px;
 }
 
 .signup-button {
