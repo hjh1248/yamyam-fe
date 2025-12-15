@@ -1,13 +1,13 @@
 <script setup>
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import axios from 'axios'
 import AppHeader from '@/components/AppHeader.vue'
+import { dietPlanApi } from '@/api'
+import { formatDate } from '@/utils'
 import { VueDatePicker } from '@vuepic/vue-datepicker'
 import '@vuepic/vue-datepicker/dist/main.css'
 
 const router = useRouter()
-
 
 // 폼 데이터
 const formData = ref({
@@ -20,25 +20,13 @@ const formData = ref({
 // 날짜 표시용 포맷 함수 (VueDatePicker용 - "2025년 12월 11일" 형식)
 const formatDateDisplay = (date) => {
   if (!date) return ''
-  
+
   const d = new Date(date)
   const year = d.getFullYear()
   const month = d.getMonth() + 1
   const day = d.getDate()
-  
+
   return `${year}년 ${month}월 ${day}일`
-}
-
-// API 전송용 날짜 포맷 함수 (YYYY-MM-DD 형식)
-const formatDateForAPI = (date) => {
-  // 이미 문자열 형식이면 그대로 반환
-  if (typeof date === 'string') return date
-
-  // Date 객체인 경우 변환
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
 }
 
 // 토스트 메시지
@@ -92,11 +80,11 @@ const handleSubmit = async () => {
     const requestData = {
       title: formData.value.title,
       content: formData.value.content,
-      startDate: formatDateForAPI(formData.value.startDate),
-      endDate: formatDateForAPI(formData.value.endDate)
+      startDate: formatDate(formData.value.startDate),
+      endDate: formatDate(formData.value.endDate)
     }
 
-    const response = await axios.post('http://localhost:8080/api/diet-plans', requestData)
+    const response = await dietPlanApi.create(requestData)
 
     displayToast('식단 계획이 생성되었습니다!')
 

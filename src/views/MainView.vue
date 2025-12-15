@@ -1,16 +1,162 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import AppHeader from '@/components/AppHeader.vue'
+import { dietPlanApi, dailyDietApi } from '@/api/diet.js'
+import { formatDate } from '@/utils/date.js'
+import { calculateDailyTotalCalorie } from '@/utils/nutrition.js' // Import from nutrition.js
 
 const router = useRouter()
 
-// 더미 데이터
-const todayMeals = ref([
-  { type: '아침', foods: ['현미밥', '된장찌개', '계란후라이'], calorie: 450 },
-  { type: '점심', foods: ['샐러드', '닭가슴살'], calorie: 380 },
-  { type: '저녁', foods: [], calorie: 0 },
-])
+// - todayMeals는 API로부터 가져온 데이터로 채워집니다.
+const todayMeals = ref([])
+const currentDietPlanId = ref(null) // 현재 대표 식단 계획 ID
+const currentDailyDietId = ref(null) // 현재 일일 식단 ID
+const hasDailyDiet = ref(false) // 오늘 등록된 일일 식단이 있는지 여부
+const hasPrimaryDietPlan = ref(false) // 대표 식단이 있는지 여부
+
+// --- Helper Functions ---
+const mealTypeToKorean = {
+  breakfast: '아침',
+  lunch: '점심',
+  dinner: '저녁',
+  snack: '간식'
+}
+
+const mealTypeToEnglishUpperCase = {
+  breakfast: 'BREAKFAST',
+  lunch: 'LUNCH',
+  dinner: 'DINNER',
+  snack: 'SNACK'
+}
+
+const mealTypeColorClass = (mealType) => {
+  switch (mealType) {
+    case '아침': return 'meal-type-breakfast';
+    case '점심': return 'meal-type-lunch';
+    case '저녁': return 'meal-type-dinner';
+    case '간식': return 'meal-type-snack';
+    default: return '';
+  }
+}
+
+const calculateTotalCalories = (mealFoods) => {
+  if (!mealFoods || mealFoods.length === 0) {
+    return 0
+  }
+  return Math.round(
+    mealFoods.reduce((total, food) => {
+      const calories = (food.quantity / 100) * food.energyPer100
+      return total + (calories || 0)
+    }, 0)
+  )
+}
+
+const transformDailyDiet = (dailyDiet, dietPlanId, dailyDietId) => {
+  if (!dailyDiet) return []
+
+  const mealTypes = ['breakfast', 'lunch', 'dinner', 'snack']
+  return mealTypes.map((mealType) => {
+    let mealContent = dailyDiet[mealType] // Can be array, object, or null
+    let foods = []
+    let calorie = 0
+    let mealId = null
+
+    if (mealContent) {
+      if (Array.isArray(mealContent)) {
+        // If it's directly an array of foods (as per API doc)
+        foods = mealContent.map((food) => food.foodName)
+        calorie = calculateTotalCalories(mealContent)
+        // No mealId available at this level if it's just an array of foods
+      } else if (typeof mealContent === 'object') {
+        // If it's an object containing meal details (as per console log's breakfast:{...})
+        mealId = mealContent.mealId
+        const mealFoodsArray = mealContent.mealFoods || []
+        foods = mealFoodsArray.map((food) => food.foodName)
+        calorie = calculateTotalCalories(mealFoodsArray)
+      }
+    }
+
+    return {
+      type: mealTypeToKorean[mealType],
+      rawType: mealTypeToEnglishUpperCase[mealType],
+      foods,
+      calorie,
+      dietPlanId: dietPlanId,
+      dailyDietId: dailyDietId,
+      mealId: mealId // Add mealId to the returned object
+    }
+  })
+}
+
+// --- Data Fetching ---
+const fetchTodayMeals = async () => {
+  try {
+    // 1. 대표 식단 계획 ID 가져오기
+    const primaryPlanResponse = await dietPlanApi.getPrimary()
+    console.log('primaryPlanResponse:', primaryPlanResponse)
+    const primaryPlanId = primaryPlanResponse.data?.dietPlanId
+    console.log('primaryPlanId:', primaryPlanId)
+
+    if (!primaryPlanId) {
+      console.warn('대표 식단 계획을 찾을 수 없습니다.')
+      hasPrimaryDietPlan.value = false // Set ref to false if no primary plan
+      todayMeals.value = [
+        { type: '아침', foods: [], calorie: 0 },
+        { type: '점심', foods: [], calorie: 0 },
+        { type: '저녁', foods: [], calorie: 0 },
+        { type: '간식', foods: [], calorie: 0 } // 간식 추가
+      ]
+      hasDailyDiet.value = false // 대표 식단이 없으므로 일일 식단도 없음
+      currentDailyDietId.value = null
+      return
+    }
+
+    // If primaryPlanId exists
+    hasPrimaryDietPlan.value = true // Set ref to true if primary plan exists
+    currentDietPlanId.value = primaryPlanId
+
+    // 2. 오늘 날짜로 일일 식단 가져오기
+    const today = formatDate(new Date())
+    console.log('today (formatted date):', today)
+    const dailyDietResponse = await dailyDietApi.getByDate(primaryPlanId, today)
+    console.log('dailyDietResponse:', dailyDietResponse)
+    const dailyDiet = dailyDietResponse.data
+    console.log('dailyDietResponse.data:', dailyDiet)
+
+    if (dailyDiet?.dailyDietId) {
+      hasDailyDiet.value = true
+      currentDailyDietId.value = dailyDiet.dailyDietId
+      // 3. 데이터 변환 및 상태 업데이트
+      todayMeals.value = transformDailyDiet(dailyDiet, primaryPlanId, dailyDiet.dailyDietId)
+      console.log('todayMeals.value after transformation:', todayMeals.value)
+    } else {
+      hasDailyDiet.value = false // 일일 식단이 없으므로
+      todayMeals.value = [
+        { type: '아침', foods: [], calorie: 0 },
+        { type: '점심', foods: [], calorie: 0 },
+        { type: '저녁', foods: [], calorie: 0 },
+        { type: '간식', foods: [], calorie: 0 } // 간식 추가
+      ]
+      // 일일 식단이 없는 경우 dailyDietId를 null로 설정
+      currentDailyDietId.value = null
+    }
+  } catch (error) {
+    console.error('오늘의 식단을 가져오는 데 실패했습니다:', error)
+    hasDailyDiet.value = false // 에러 발생 시 일일 식단 없음
+    todayMeals.value = [
+        { type: '아침', foods: [], calorie: 0 },
+        { type: '점심', foods: [], calorie: 0 },
+        { type: '저녁', foods: [], calorie: 0 },
+        { type: '간식', foods: [], calorie: 0 } // 간식 추가
+    ]
+    currentDailyDietId.value = null
+  }
+}
+
+onMounted(() => {
+  fetchTodayMeals()
+})
 
 const nutritionAnalysis = ref({
   totalCalorie: 830,
@@ -54,20 +200,63 @@ const recentPosts = ref([
           <div class="card large-card">
             <div class="card-header">
               <h2 class="card-title">오늘의 식단</h2>
+              <button
+                class="diet-detail-edit-btn"
+                @click="router.push({
+                  name: 'diet-plan-detail', // Changed from 'edit-diet'
+                  query: {
+                    id: currentDietPlanId
+                  }
+                })"
+                :disabled="!currentDietPlanId"
+              >
+                식단 상세
+              </button>
             </div>
-            <div class="meals-list">
-              <div v-for="meal in todayMeals" :key="meal.type" class="meal-item">
-                <div class="meal-header">
-                  <span class="meal-type">{{ meal.type }}</span>
-                  <span class="meal-calorie">{{ meal.calorie }}kcal</span>
-                </div>
-                <div class="meal-foods">
-                  <div v-if="meal.foods.length === 0" class="empty-meal-container">
-                    <button class="meal-add-btn" @click="router.push(`/diet/add?mealType=${meal.type}`)">+ 식단 추가</button>
+            <div v-if="hasPrimaryDietPlan">
+              <div v-if="hasDailyDiet" class="meals-list">
+                <div v-for="meal in todayMeals" :key="meal.type" class="meal-item">
+                  <div class="meal-header">
+                    <span :class="['meal-type', mealTypeColorClass(meal.type)]">{{ meal.type }}</span>
+                    <span class="meal-calorie">{{ meal.calorie }}kcal</span>
                   </div>
-                  <span v-else class="food-list">{{ meal.foods.join(', ') }}</span>
+                                  <div class="meal-foods">
+                                    <div
+                                      v-if="meal.foods.length > 0"
+                                      class="meal-actions"
+                                    >
+                                      <div class="food-list-container">
+                                        <span v-for="(foodName, index) in meal.foods" :key="index" class="food-item-display">
+                                          {{ foodName }}
+                                        </span>
+                                      </div>
+                                    
+                                    </div>
+                                    <div v-else class="empty-meal-container">
+                                      <button
+                                        class="meal-add-btn"
+                                        @click="router.push({
+                                          name: 'meal-detail',
+                                          query: {
+                                            dietPlanId: currentDietPlanId,
+                                            dailyDietId: currentDailyDietId,
+                                            mealType: meal.rawType
+                                          }
+                                        })"
+                                      >+ 식단 추가</button>
+                                    </div>
+                                  </div>
                 </div>
               </div>
+              <div v-else class="no-daily-diet-message">
+                오늘 등록된 식단이 없습니다.
+              </div>
+            </div>
+            <div v-else class="empty-primary-diet-plan">
+              <p class="empty-message">대표 식단 계획이 설정되지 않았습니다.</p>
+              <button class="create-diet-plan-btn" @click="router.push('/diet/add')">
+                식단 생성하러 가기
+              </button>
             </div>
           </div>
 
@@ -234,6 +423,28 @@ const recentPosts = ref([
   color: #333333;
 }
 
+.diet-detail-edit-btn {
+  padding: 8px 16px;
+  background: #E0E0E0; /* A neutral background */
+  color: #333333;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.3s ease, color 0.3s ease;
+}
+
+.diet-detail-edit-btn:hover:not(:disabled) {
+  background: #CCCCCC; /* Darker on hover */
+  color: #111111;
+}
+
+.diet-detail-edit-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .add-btn {
   padding: 8px 16px;
   background: #4CAF50;
@@ -284,8 +495,25 @@ const recentPosts = ref([
 
 .meal-type {
   font-weight: 700;
-  color: #4CAF50;
+  color: #4CAF50; /* Default green, will be overridden by specific types */
   font-size: 16px;
+}
+
+/* Meal Type Specific Colors */
+.meal-type-breakfast {
+  color: #FF9800; /* Orange - more noticeable */
+}
+
+.meal-type-lunch {
+  color: #2196F3; /* Blue - fresh blue */
+}
+
+.meal-type-dinner {
+  color: #9C27B0; /* Deep Purple - rich purple */
+}
+
+.meal-type-snack {
+  color: #E91E63; /* Pink - vibrant pink */
 }
 
 .meal-calorie {
@@ -325,10 +553,60 @@ const recentPosts = ref([
   border-style: solid;
 }
 
-.food-list {
+.food-list-message { /* Renamed for clarity, original was food-list */
   color: #333333;
   font-size: 14px;
   line-height: 1.6;
+  flex-grow: 1; /* Allow it to take available space */
+}
+
+.meal-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  gap: 10px; /* Add some space between food list and button */
+}
+
+.meal-detail-btn {
+  padding: 8px 12px;
+  background: #4CAF50;
+  color: #FFFFFF;
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap; /* Prevent text wrapping */
+  transition: background 0.3s ease;
+}
+
+.meal-detail-btn:hover {
+  background: #45A049;
+}
+
+.food-list-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px; /* Space between food items */
+  flex-grow: 1; /* Allow container to take available space */
+}
+
+.food-item-display {
+  background-color: #E8F5E9; /* Lighter, more vibrant background */
+  border: 1px solid #A5D6A7; /* Matching border color */
+  border-radius: 20px; /* Pill shape */
+  padding: 6px 12px;
+  font-size: 13px;
+  color: #333333;
+  white-space: nowrap;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1); /* Subtle shadow for "lift" */
+  transition: all 0.2s ease;
+}
+
+.food-item-display:hover {
+  box-shadow: 0 2px 6px rgba(0,0,0,0.15); /* Slightly more prominent shadow on hover */
+  transform: translateY(-1px);
 }
 
 /* AI 영양 분석 */
@@ -568,4 +846,56 @@ const recentPosts = ref([
     width: 95%;
   }
 }
+
+.no-daily-diet-message {
+  padding: 40px;
+  text-align: center;
+  color: #666666;
+  font-size: 16px;
+  background: #F8F9FA;
+  border-radius: 12px;
+  border: 2px dashed #E0E0E0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 150px;
+  line-height: 1.5;
+  font-weight: 500;
+}
+
+.empty-primary-diet-plan {
+  padding: 40px;
+  text-align: center;
+  background: #F8F9FA;
+  border-radius: 12px;
+  border: 2px dashed #FFCC80; /* A color that stands out but isn't error-like */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+  line-height: 1.5;
+  font-weight: 500;
+}
+
+.create-diet-plan-btn {
+  margin-top: 20px;
+  padding: 12px 24px;
+  background: #FF9800; /* Orange color for action */
+  color: #FFFFFF;
+  border: none;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(255, 152, 0, 0.3);
+}
+
+.create-diet-plan-btn:hover {
+  background: #FB8C00; /* Darker orange on hover */
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(255, 152, 0, 0.4);
+}
+
 </style>

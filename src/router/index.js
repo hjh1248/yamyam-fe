@@ -4,7 +4,9 @@ import SignupView from '../views/SignupView.vue'
 import MainView from '../views/MainView.vue'
 import DietView from '../views/DietView.vue'
 import AddDietView from '../views/AddDietView.vue'
-import EditDietView from '../views/EditDietView.vue'
+import MealDetailView from '../views/MealDetailView.vue'
+import CreateDailyDietView from '../views/CreateDailyDietView.vue'
+import DietPlanDetailView from '../views/DietPlanDetailView.vue' // Renamed from EditDietView
 import BoardView from '../views/BoardView.vue'
 import WriteBoardView from '../views/WriteBoardView.vue'
 import BoardDetailView from '../views/BoardDetailView.vue'
@@ -48,9 +50,19 @@ const router = createRouter({
       component: AddDietView
     },
     {
-      path: '/diet/edit',
-      name: 'edit-diet',
-      component: EditDietView
+      path: '/diet/detail', // Changed from /diet/edit
+      name: 'diet-plan-detail', // Changed from edit-diet
+      component: DietPlanDetailView // Renamed component
+    },
+    {
+      path: '/diet/meal',
+      name: 'meal-detail',
+      component: MealDetailView
+    },
+    {
+      path: '/diet/daily/create',
+      name: 'create-daily-diet',
+      component: CreateDailyDietView
     },
     {
       path: '/board',

@@ -1,8 +1,9 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import axios from 'axios'
 import AppHeader from '@/components/AppHeader.vue'
+import { dietPlanApi } from '@/api'
+import { formatDateDot, calculateDuration } from '@/utils'
 
 const router = useRouter()
 
@@ -19,12 +20,13 @@ const fetchDietPlans = async () => {
   networkError.value = false
 
   try {
-    const response = await axios.get('http://localhost:8080/api/diet-plans/my')
+    const response = await dietPlanApi.getMyList()
     dietPlans.value = response.data.map(plan => ({
       id: plan.dietPlanId,
       title: plan.title,
       startDate: plan.startDate,
-      endDate: plan.endDate
+      endDate: plan.endDate,
+      primary: plan.primary
     }))
   } catch (error) {
     console.error('식단 계획 조회 실패:', error)
@@ -36,31 +38,12 @@ const fetchDietPlans = async () => {
 
 // 식단 계획 상세 페이지로 이동
 const goToDietPlanDetail = (planId) => {
-  router.push(`/diet/edit?id=${planId}`)
+  router.push(`/diet/detail?id=${planId}`) // Changed path
 }
 
 // 새 식단 계획 추가
 const goToAddDietPlan = () => {
   router.push('/diet/add')
-}
-
-// 날짜 포맷팅
-const formatDate = (dateStr) => {
-  if (!dateStr) return ''
-  const date = new Date(dateStr)
-  const year = date.getFullYear()
-  const month = date.getMonth() + 1
-  const day = date.getDate()
-  return `${year}.${month}.${day}`
-}
-
-// 기간 계산 (며칠 동안)
-const calculateDuration = (startDate, endDate) => {
-  const start = new Date(startDate)
-  const end = new Date(endDate)
-  const diffTime = Math.abs(end - start)
-  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1
-  return `${diffDays}일`
 }
 
 onMounted(() => {
@@ -113,20 +96,23 @@ onMounted(() => {
             @click="goToDietPlanDetail(plan.id)"
           >
             <div class="plan-card-header">
-              <h3 class="plan-card-title">{{ plan.title }}</h3>
+              <div class="title-with-badge">
+                <h3 class="plan-card-title">{{ plan.title }}</h3>
+                <span v-if="plan.primary" class="primary-badge">대표 식단</span>
+              </div>
             </div>
             <div class="plan-card-body">
               <div class="plan-info-row">
                 <span class="info-label">기간</span>
-                <span class="info-value">{{ calculateDuration(plan.startDate, plan.endDate) }}</span>
+                <span class="info-value">{{ calculateDuration(plan.startDate, plan.endDate) }}일</span>
               </div>
               <div class="plan-info-row">
                 <span class="info-label">시작일</span>
-                <span class="info-value">{{ formatDate(plan.startDate) }}</span>
+                <span class="info-value">{{ formatDateDot(plan.startDate) }}</span>
               </div>
               <div class="plan-info-row">
                 <span class="info-label">종료일</span>
-                <span class="info-value">{{ formatDate(plan.endDate) }}</span>
+                <span class="info-value">{{ formatDateDot(plan.endDate) }}</span>
               </div>
             </div>
             <div class="plan-card-footer">
@@ -307,11 +293,32 @@ onMounted(() => {
   border-bottom: 2px solid #F0F0F0;
 }
 
+.title-with-badge {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
 .plan-card-title {
   font-size: 20px;
   font-weight: 700;
   color: #333333;
   margin: 0;
+}
+
+.primary-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 12px;
+  background: linear-gradient(135deg, #4CAF50 0%, #45A049 100%);
+  color: #FFFFFF;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  box-shadow: 0 2px 6px rgba(76, 175, 80, 0.25);
+  flex-shrink: 0;
 }
 
 .plan-card-body {
