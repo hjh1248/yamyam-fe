@@ -65,6 +65,11 @@ const router = createRouter({
       component: CreateDailyDietView
     },
     {
+      path: '/diet/plan/update',
+      name: 'update-diet-plan',
+      component: () => import('@/views/UpdateDietPlanView.vue')
+    },
+    {
       path: '/board',
       name: 'board',
       component: BoardView

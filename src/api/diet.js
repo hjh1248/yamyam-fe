@@ -36,7 +36,14 @@ export const dietPlanApi = {
    * 대표 식단 변경
    */
   updatePrimary(dietPlanId) {
-    return apiClient.patch(`/api/diet-plans/${dietPlanId}`)
+    return apiClient.patch(`/api/diet-plans/${dietPlanId}/primary`)
+  },
+
+  /**
+   * 식단 계획 수정
+   */
+  update(dietPlanId, data) {
+    return apiClient.patch(`/api/diet-plans/${dietPlanId}`, data)
   },
 
   /**

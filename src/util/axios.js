@@ -16,6 +16,9 @@ instance.interceptors.request.use(
     const token = localStorage.getItem('accessToken')
     if (token) {
       config.headers['Authorization'] = `Bearer ${token}`
+      console.log(`[Axios Interceptor] Authorization Header: ${config.headers['Authorization']}`)
+    } else {
+      console.log('[Axios Interceptor] No Access Token found in localStorage.')
     }
     return config
   },

@@ -352,6 +352,13 @@ const handleDelete = async () => {
   }
 };
 
+const goToUpdatePage = () => {
+  router.push({
+    path: `/diet/plan/update`,
+    query: { id: dietPlan.value.id }
+  });
+};
+
 // 대표 식단으로 설정
 const setPrimaryDietPlan = async () => {
   if (!dietPlan.value || dietPlan.value.primary) return;
@@ -418,6 +425,7 @@ onMounted(async () => {
             <button v-if="!dietPlan.primary" class="set-primary-btn" @click="setPrimaryDietPlan">
               대표 식단으로 설정
             </button>
+            <button class="update-btn" @click="goToUpdatePage">수정</button>
             <button class="delete-btn" @click="handleDelete">삭제</button>
           </div>
         </div>
@@ -972,6 +980,7 @@ onMounted(async () => {
 }
 
 .set-primary-btn,
+.update-btn,
 .delete-btn {
   padding: 10px 20px;
   border-radius: 8px;
@@ -989,6 +998,16 @@ onMounted(async () => {
 
 .set-primary-btn:hover {
   background: #45A049;
+}
+
+.update-btn {
+  background: #FFF8E1;
+  color: #FFAB00;
+}
+
+.update-btn:hover {
+  background: #FFAB00;
+  color: #FFFFFF;
 }
 
 .delete-btn {
@@ -1584,6 +1603,7 @@ onMounted(async () => {
   }
 
   .set-primary-btn,
+  .update-btn,
   .delete-btn {
     flex: 1;
     min-width: 120px;
@@ -1679,6 +1699,7 @@ onMounted(async () => {
   }
 
   .set-primary-btn,
+  .update-btn,
   .delete-btn {
     font-size: 13px;
     padding: 8px 16px;
