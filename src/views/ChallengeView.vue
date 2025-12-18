@@ -210,8 +210,6 @@ const displayToast = (msg) => { toastMessage.value = msg; showToast.value = true
 const fetchUserInfo = async () => {
     try {
         const res = await api.get('/api/users/me')
-        console.log("서버 응답 데이터:", res.data) 
-        console.log("내가 꺼낸 ID:", res.data.id)
         currentUserId.value = res.data.id
     } catch (e) { console.error(e) }
 }
