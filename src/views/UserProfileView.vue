@@ -1,42 +1,107 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
-import { useRouter, useRoute } from 'vue-router'
+import { ref, computed, onMounted, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import AppHeader from '@/components/AppHeader.vue'
+import api from '@/util/axios'
 
-const router = useRouter()
 const route = useRoute()
+const router = useRouter()
 
-// URL에서 받은 사용자 ID
-const userId = ref(null)
+// URL에서 유저 ID 가져오기
+const targetUserId = route.params.id
 
-// 더미 데이터 - 다른 사용자 정보
+// 1. 타인 유저 정보
 const userInfo = ref({
-  name: '이영희',
-  nickname: '헬스매니아',
-  email: 'younghee@yamyam.com'
+  id: '',
+  name: '',
+  nickname: '',
+  email: ''
 })
 
-// 팔로우 상태
+// 2. 팔로우 상태 관리
 const isFollowing = ref(false)
-
-// 더미 데이터 - 팔로워/팔로잉 수
 const followStats = ref({
-  followers: 12,
-  following: 8
+  followers: 0,
+  following: 0
 })
 
-// 더미 데이터 - 신체 정보 이력 (공개 설정된 경우만 표시)
-const bodySpecs = ref([
-  { id: 1, height: 165, weight: 58, age: 25, gender: '여성', date: '2025-01-01' },
-  { id: 2, height: 165, weight: 57, age: 25, gender: '여성', date: '2025-01-08' },
-  { id: 3, height: 165, weight: 56, age: 25, gender: '여성', date: '2025-01-15' },
-  { id: 4, height: 165, weight: 55, age: 25, gender: '여성', date: '2025-01-22' },
-  { id: 5, height: 165, weight: 54, age: 25, gender: '여성', date: '2025-01-29' },
-])
+// 3. 타인의 신체 정보 이력
+const bodySpecs = ref([])
 
-// 토스트
-const showToast = ref(false)
-const toastMessage = ref('')
+// --- [API 통신 함수들] ---
+
+const fetchUserProfile = async () => {
+  try {
+    // 유저 기본 정보 조회 (백엔드에서 isFollowing 여부 포함)
+    const response = await api.get(`/api/users/${targetUserId}`)
+    const data = response.data
+    console.log("서버에서 온 데이터:", data)
+
+    userInfo.value = {
+      id: data.id,
+      name: data.name,
+      nickname: data.nickname,
+      email: data.email
+    }
+
+    followStats.value = {
+      followers: data.followers,
+      following: data.following
+    }
+    
+    // 백엔드에서 받은 팔로우 여부 적용
+    isFollowing.value = data.isFollowing || false 
+
+  } catch (error) {
+    console.error('유저 정보 로딩 실패:', error)
+    alert('존재하지 않거나 조회할 수 없는 유저입니다.')
+    router.push('/')
+  }
+}
+
+const fetchUserBodySpecs = async () => {
+  try {
+    // ★ API 경로 수정됨: /api/body-specs/users/{userId}
+    const response = await api.get(`/api/body-specs/users/${targetUserId}`)
+    bodySpecs.value = response.data.sort((a, b) => new Date(a.date) - new Date(b.date))
+  } catch (error) {
+    console.error('신체 정보 로딩 실패:', error)
+  }
+}
+
+// 팔로우 / 언팔로우 토글
+const toggleFollow = async () => {
+  try {
+    if (isFollowing.value) {
+      // 언팔로우
+      await api.delete(`/api/follows/${targetUserId}`)
+      isFollowing.value = false
+      followStats.value.followers-- 
+    } else {
+      // 팔로우
+      await api.post(`/api/follows/${targetUserId}`)
+      isFollowing.value = true
+      followStats.value.followers++ 
+    }
+  } catch (error) {
+    console.error('팔로우 처리 실패:', error)
+    alert('작업을 처리할 수 없습니다.')
+  }
+}
+
+onMounted(async () => {
+  await Promise.all([
+    fetchUserProfile(),
+    fetchUserBodySpecs()
+  ])
+})
+
+// 라우트 ID 변경 시 데이터 갱신
+watch(() => route.params.id, (newId) => {
+    location.reload() 
+})
+
+// --- [계산 로직 (읽기 전용)] ---
 
 // 최신 신체 정보
 const latestBodySpec = computed(() => {
@@ -51,7 +116,6 @@ const bmi = computed(() => {
   return (latestBodySpec.value.weight / (heightM * heightM)).toFixed(1)
 })
 
-// BMI 상태
 const bmiStatus = computed(() => {
   const bmiValue = parseFloat(bmi.value)
   if (bmiValue < 18.5) return { text: '저체중', color: '#2196F3' }
@@ -60,13 +124,13 @@ const bmiStatus = computed(() => {
   return { text: '비만', color: '#F44336' }
 })
 
-// 그래프 데이터 (최근 10개)
+// 차트 데이터 (최근 10개)
 const chartData = computed(() => {
   const sorted = [...bodySpecs.value].sort((a, b) => new Date(a.date) - new Date(b.date))
   return sorted.slice(-10)
 })
 
-// 그래프 관련 계산
+// 차트 관련 상수
 const chartWidth = 800
 const chartHeight = 300
 const chartPadding = { top: 20, right: 40, bottom: 60, left: 60 }
@@ -83,7 +147,6 @@ const weightRange = computed(() => {
   }
 })
 
-// 좌표 계산
 const getX = (index) => {
   const dataWidth = chartWidth - chartPadding.left - chartPadding.right
   return chartPadding.left + (dataWidth / (chartData.value.length - 1 || 1)) * index
@@ -95,7 +158,6 @@ const getY = (weight) => {
   return chartPadding.top + dataHeight - ((weight - weightRange.value.min) / range * dataHeight)
 }
 
-// 그래프 경로
 const chartPath = computed(() => {
   if (chartData.value.length === 0) return ''
   return chartData.value.map((d, i) => {
@@ -105,107 +167,39 @@ const chartPath = computed(() => {
   }).join(' ')
 })
 
-// Y축 눈금
 const yAxisTicks = computed(() => {
   const range = weightRange.value.max - weightRange.value.min
   const step = Math.ceil(range / 5)
   const ticks = []
   for (let i = 0; i <= 5; i++) {
     const value = weightRange.value.min + step * i
-    ticks.push({
-      value,
-      y: getY(value)
-    })
+    ticks.push({ value, y: getY(value) })
   }
   return ticks.reverse()
 })
-
-// 마운트 시 사용자 ID 가져오기
-onMounted(() => {
-  userId.value = route.params.id
-  // 실제로는 API 호출로 사용자 정보 로드
-  loadUserProfile(userId.value)
-})
-
-const loadUserProfile = (id) => {
-  // 더미 데이터 - 실제로는 API 호출
-  const users = {
-    1: { name: '김철수', nickname: 'chulsoo', email: 'chulsoo@yamyam.com', followers: 8, following: 5 },
-    2: { name: '이영희', nickname: 'younghee', email: 'younghee@yamyam.com', followers: 12, following: 8 },
-    3: { name: '박지민', nickname: 'jimin', email: 'jimin@yamyam.com', followers: 15, following: 10 },
-    4: { name: '최민수', nickname: 'minsu', email: 'minsu@yamyam.com', followers: 6, following: 12 },
-    5: { name: '정수현', nickname: 'suhyun', email: 'suhyun@yamyam.com', followers: 20, following: 15 },
-    6: { name: '강다은', nickname: 'daeun', email: 'daeun@yamyam.com', followers: 9, following: 7 },
-    7: { name: '윤서준', nickname: 'seojun', email: 'seojun@yamyam.com', followers: 11, following: 9 },
-    8: { name: '임하늘', nickname: 'haneul', email: 'haneul@yamyam.com', followers: 14, following: 11 }
-  }
-
-  if (users[id]) {
-    userInfo.value = {
-      name: users[id].name,
-      nickname: users[id].nickname,
-      email: users[id].email
-    }
-    followStats.value = {
-      followers: users[id].followers,
-      following: users[id].following
-    }
-  }
-
-  // 팔로우 상태 확인 (더미 - 실제로는 API에서)
-  const myFollowing = [2, 5]
-  isFollowing.value = myFollowing.includes(parseInt(id))
-}
-
-// 팔로우/언팔로우
-const toggleFollow = () => {
-  isFollowing.value = !isFollowing.value
-  if (isFollowing.value) {
-    followStats.value.followers++
-    displayToast(`${userInfo.value.name}님을 팔로우했습니다.`)
-  } else {
-    followStats.value.followers--
-    displayToast(`${userInfo.value.name}님을 언팔로우했습니다.`)
-  }
-}
-
-// 토스트
-const displayToast = (message) => {
-  toastMessage.value = message
-  showToast.value = true
-  setTimeout(() => {
-    showToast.value = false
-  }, 3000)
-}
 </script>
 
 <template>
-  <div class="profile-container">
-    <!-- 상단 네비게이션 -->
+  <div class="mypage-container">
     <AppHeader active-page="" />
 
-    <!-- 메인 콘텐츠 -->
     <main class="main-content">
       <div class="content-wrapper">
         <div class="page-header">
-          <div>
-            <button @click="router.back()" class="back-btn">← 돌아가기</button>
-            <h1 class="page-title">{{ userInfo.name }}님의 프로필</h1>
-          </div>
-          <button
-            @click="toggleFollow"
-            :class="['follow-action-btn', { 'following': isFollowing }]"
-          >
-            {{ isFollowing ? '언팔로우' : '팔로우' }}
-          </button>
+          <h1 class="page-title">{{ userInfo.nickname }}님의 프로필</h1>
         </div>
 
-        <!-- 그리드 레이아웃 -->
         <div class="grid-layout">
-          <!-- 사용자 정보 카드 -->
           <div class="card user-info-card">
             <div class="card-header">
-              <h2 class="card-title">정보</h2>
+              <h2 class="card-title">유저 정보</h2>
+              <button 
+                class="follow-btn" 
+                :class="{ 'following': isFollowing }"
+                @click="toggleFollow"
+              >
+                {{ isFollowing ? '언팔로우' : '팔로우' }}
+              </button>
             </div>
             <div class="user-info">
               <div class="info-row">
@@ -222,24 +216,24 @@ const displayToast = (message) => {
               </div>
             </div>
 
-            <!-- 팔로워/팔로잉 섹션 -->
-            <div class="follow-section">
-              <div class="follow-item" @click="router.push(`/user/${userId}/followers`)">
-                <div class="follow-count">{{ followStats.followers }}</div>
-                <div class="follow-label">팔로워</div>
-              </div>
-              <div class="follow-divider"></div>
-              <div class="follow-item" @click="router.push(`/user/${userId}/following`)">
-                <div class="follow-count">{{ followStats.following }}</div>
-                <div class="follow-label">팔로잉</div>
+            <div class="follow-wrapper">
+              <div class="follow-section">
+                <div class="follow-item">
+                  <div class="follow-count">{{ followStats.followers }}</div>
+                  <div class="follow-label">팔로워</div>
+                </div>
+                <div class="follow-divider"></div>
+                <div class="follow-item">
+                  <div class="follow-count">{{ followStats.following }}</div>
+                  <div class="follow-label">팔로잉</div>
+                </div>
               </div>
             </div>
           </div>
 
-          <!-- 최신 신체 정보 카드 -->
           <div class="card body-info-card">
             <div class="card-header">
-              <h2 class="card-title">현재 신체 정보</h2>
+              <h2 class="card-title">현재 상태</h2>
             </div>
             <div v-if="latestBodySpec" class="body-info">
               <div class="body-stats">
@@ -270,119 +264,42 @@ const displayToast = (message) => {
               </div>
             </div>
             <div v-else class="empty-body-info">
-              <p class="empty-text">공개된 신체 정보가 없습니다</p>
+              <p class="empty-text">공개된 신체 정보가 없습니다.</p>
             </div>
           </div>
 
-          <!-- 체중 변화 그래프 -->
           <div class="card chart-card">
             <div class="card-header">
               <h2 class="card-title">체중 변화 추이</h2>
             </div>
             <div v-if="chartData.length >= 2" class="chart-container">
               <svg :width="chartWidth" :height="chartHeight" class="chart-svg">
-                <!-- 그리드 라인 -->
                 <g class="grid-lines">
-                  <line
-                    v-for="tick in yAxisTicks"
-                    :key="tick.value"
-                    :x1="chartPadding.left"
-                    :y1="tick.y"
-                    :x2="chartWidth - chartPadding.right"
-                    :y2="tick.y"
-                    stroke="#E0E0E0"
-                    stroke-dasharray="4"
-                  />
+                  <line v-for="tick in yAxisTicks" :key="tick.value" :x1="chartPadding.left" :y1="tick.y" :x2="chartWidth - chartPadding.right" :y2="tick.y" stroke="#E0E0E0" stroke-dasharray="4"/>
                 </g>
-
-                <!-- Y축 -->
                 <g class="y-axis">
-                  <line
-                    :x1="chartPadding.left"
-                    :y1="chartPadding.top"
-                    :x2="chartPadding.left"
-                    :y2="chartHeight - chartPadding.bottom"
-                    stroke="#666"
-                    stroke-width="2"
-                  />
-                  <text
-                    v-for="tick in yAxisTicks"
-                    :key="tick.value"
-                    :x="chartPadding.left - 10"
-                    :y="tick.y + 5"
-                    text-anchor="end"
-                    class="axis-label"
-                  >
-                    {{ tick.value }}kg
-                  </text>
+                  <line :x1="chartPadding.left" :y1="chartPadding.top" :x2="chartPadding.left" :y2="chartHeight - chartPadding.bottom" stroke="#666" stroke-width="2"/>
+                  <text v-for="tick in yAxisTicks" :key="tick.value" :x="chartPadding.left - 10" :y="tick.y + 5" text-anchor="end" class="axis-label">{{ tick.value }}kg</text>
                 </g>
-
-                <!-- X축 -->
                 <g class="x-axis">
-                  <line
-                    :x1="chartPadding.left"
-                    :y1="chartHeight - chartPadding.bottom"
-                    :x2="chartWidth - chartPadding.right"
-                    :y2="chartHeight - chartPadding.bottom"
-                    stroke="#666"
-                    stroke-width="2"
-                  />
-                  <text
-                    v-for="(d, i) in chartData"
-                    :key="i"
-                    :x="getX(i)"
-                    :y="chartHeight - chartPadding.bottom + 25"
-                    text-anchor="middle"
-                    class="axis-label"
-                  >
-                    {{ d.date.substring(5) }}
-                  </text>
+                  <line :x1="chartPadding.left" :y1="chartHeight - chartPadding.bottom" :x2="chartWidth - chartPadding.right" :y2="chartHeight - chartPadding.bottom" stroke="#666" stroke-width="2"/>
+                  <text v-for="(d, i) in chartData" :key="i" :x="getX(i)" :y="chartHeight - chartPadding.bottom + 25" text-anchor="middle" class="axis-label">{{ d.date.substring(5) }}</text>
                 </g>
-
-                <!-- 데이터 라인 -->
-                <path
-                  :d="chartPath"
-                  fill="none"
-                  stroke="#4CAF50"
-                  stroke-width="3"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                />
-
-                <!-- 데이터 포인트 -->
+                <path :d="chartPath" fill="none" stroke="#4CAF50" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
                 <g class="data-points">
-                  <circle
-                    v-for="(d, i) in chartData"
-                    :key="i"
-                    :cx="getX(i)"
-                    :cy="getY(d.weight)"
-                    r="6"
-                    fill="#4CAF50"
-                    stroke="#FFFFFF"
-                    stroke-width="2"
-                  />
-                  <text
-                    v-for="(d, i) in chartData"
-                    :key="'label-' + i"
-                    :x="getX(i)"
-                    :y="getY(d.weight) - 15"
-                    text-anchor="middle"
-                    class="data-label"
-                  >
-                    {{ d.weight }}kg
-                  </text>
+                  <circle v-for="(d, i) in chartData" :key="i" :cx="getX(i)" :cy="getY(d.weight)" r="6" fill="#4CAF50" stroke="#FFFFFF" stroke-width="2"/>
+                  <text v-for="(d, i) in chartData" :key="'label-' + i" :x="getX(i)" :y="getY(d.weight) - 15" text-anchor="middle" class="data-label">{{ d.weight }}kg</text>
                 </g>
               </svg>
             </div>
             <div v-else class="empty-chart">
-              <p class="empty-text">2개 이상의 기록이 필요합니다</p>
+              <p class="empty-text">데이터가 부족하여 그래프를 표시할 수 없습니다.</p>
             </div>
           </div>
 
-          <!-- 신체 정보 이력 -->
           <div class="card history-card">
             <div class="card-header">
-              <h2 class="card-title">신체 정보 이력</h2>
+              <h2 class="card-title">기록 이력</h2>
             </div>
             <div v-if="bodySpecs.length > 0" class="history-list">
               <div
@@ -395,545 +312,91 @@ const displayToast = (message) => {
                   <span class="history-stat">키: {{ spec.height }}cm</span>
                   <span class="history-stat">체중: {{ spec.weight }}kg</span>
                   <span class="history-stat">나이: {{ spec.age }}세</span>
-                  <span class="history-stat">성별: {{ spec.gender }}</span>
                 </div>
-              </div>
+                </div>
             </div>
             <div v-else class="empty-history">
-              <p class="empty-text">공개된 신체 정보 기록이 없습니다</p>
+              <p class="empty-text">기록이 없습니다.</p>
             </div>
           </div>
         </div>
       </div>
     </main>
-
-    <!-- 토스트 메시지 -->
-    <div v-if="showToast" class="toast-message">
-      <div class="toast-icon">✓</div>
-      <span class="toast-text">{{ toastMessage }}</span>
-    </div>
   </div>
 </template>
 
 <style scoped>
-.profile-container {
-  min-height: 100vh;
-  background-color: #F5F7FA;
-}
+/* MyPage.vue 스타일 베이스 */
+.mypage-container { min-height: 100vh; background-color: #F5F7FA; }
+.main-content { padding: 40px; }
+.content-wrapper { max-width: 1400px; margin: 0 auto; }
+.page-header { margin-bottom: 32px; }
+.page-title { font-size: 32px; font-weight: 700; color: #333333; }
 
-/* 메인 콘텐츠 */
-.main-content {
-  padding: 40px;
-}
+.grid-layout { display: grid; grid-template-columns: repeat(2, 1fr); gap: 24px; }
+.card { background: #FFFFFF; border-radius: 12px; padding: 24px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06); }
+.card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+.card-title { font-size: 20px; font-weight: 700; color: #333333; }
 
-.content-wrapper {
-  max-width: 1400px;
-  margin: 0 auto;
+/* 팔로우 버튼 */
+.follow-btn {
+  padding: 8px 24px; background: #4CAF50; color: #FFFFFF;
+  border: none; border-radius: 6px; font-size: 14px; font-weight: 600;
+  cursor: pointer; transition: all 0.2s ease;
 }
+.follow-btn:hover { background: #45A049; transform: translateY(-2px); }
+.follow-btn.following { background: #E0E0E0; color: #555555; }
+.follow-btn.following:hover { background: #D5D5D5; }
 
-.page-header {
-  margin-bottom: 32px;
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-end;
-}
+/* 유저 정보 */
+.user-info { display: flex; flex-direction: column; gap: 16px; margin-bottom: 20px; }
+.info-row { display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #F0F0F0; }
+.info-label { font-size: 15px; font-weight: 600; color: #666666; }
+.info-value { font-size: 15px; color: #333333; }
 
-.back-btn {
-  padding: 8px 16px;
-  background: transparent;
-  border: 1px solid #E0E0E0;
-  border-radius: 6px;
-  color: #666666;
-  font-size: 14px;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  margin-bottom: 12px;
-}
-
-.back-btn:hover {
-  background: #F5F7FA;
-  border-color: #999999;
-  color: #333333;
-}
-
-.page-title {
-  font-size: 32px;
-  font-weight: 700;
-  color: #333333;
-}
-
-.follow-action-btn {
-  padding: 12px 32px;
-  background: #4CAF50;
-  color: #FFFFFF;
-  border: none;
-  border-radius: 8px;
-  font-size: 16px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.follow-action-btn:hover {
-  background: #45A049;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
-}
-
-.follow-action-btn.following {
-  background: #FFFFFF;
-  color: #666666;
-  border: 2px solid #E0E0E0;
-}
-
-.follow-action-btn.following:hover {
-  background: #F5F7FA;
-  border-color: #999999;
-  color: #333333;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-}
-
-/* 그리드 레이아웃 */
-.grid-layout {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 24px;
-}
-
-/* 카드 */
-.card {
-  background: #FFFFFF;
-  border-radius: 12px;
-  padding: 24px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-}
-
-.card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
-}
-
-.card-title {
-  font-size: 20px;
-  font-weight: 700;
-  color: #333333;
-}
-
-/* 사용자 정보 */
-.user-info {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  margin-bottom: 20px;
-}
-
-.info-row {
-  display: flex;
-  justify-content: space-between;
-  padding: 12px 0;
-  border-bottom: 1px solid #F0F0F0;
-}
-
-.info-row:last-child {
-  border-bottom: none;
-}
-
-.info-label {
-  font-size: 15px;
-  font-weight: 600;
-  color: #666666;
-}
-
-.info-value {
-  font-size: 15px;
-  color: #333333;
-}
-
-/* 팔로워/팔로잉 섹션 */
-.follow-section {
-  display: flex;
-  align-items: center;
-  justify-content: space-around;
-  padding: 20px;
-  background: #F8F9FA;
-  border-radius: 8px;
-  margin-top: 8px;
-}
-
-.follow-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  padding: 8px 16px;
-  border-radius: 8px;
-}
-
-.follow-item:hover {
-  background: #E8F5E9;
-  transform: translateY(-2px);
-}
-
-.follow-count {
-  font-size: 28px;
-  font-weight: 700;
-  color: #4CAF50;
-}
-
-.follow-label {
-  font-size: 14px;
-  font-weight: 500;
-  color: #666666;
-}
-
-.follow-divider {
-  width: 1px;
-  height: 40px;
-  background: #E0E0E0;
-}
+/* 팔로워/팔로잉 */
+.follow-wrapper { background: #F8F9FA; border-radius: 8px; margin-top: 8px; padding: 16px; }
+.follow-section { display: flex; align-items: center; justify-content: space-around; }
+.follow-item { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 4px 16px; }
+.follow-count { font-size: 24px; font-weight: 700; color: #4CAF50; }
+.follow-label { font-size: 14px; font-weight: 500; color: #666666; }
+.follow-divider { width: 1px; height: 30px; background: #E0E0E0; }
 
 /* 신체 정보 */
-.body-info {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
+.body-info { display: flex; flex-direction: column; gap: 20px; }
+.body-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.stat-item { text-align: center; padding: 16px; background: #F8F9FA; border-radius: 8px; }
+.stat-label { display: block; font-size: 13px; color: #888888; margin-bottom: 8px; }
+.stat-value { font-size: 28px; font-weight: 700; color: #333333; }
+.stat-unit { font-size: 16px; font-weight: 500; color: #888888; margin-left: 4px; }
 
-.body-stats {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 16px;
-}
+.bmi-section { padding: 16px; background: #F8F9FA; border-radius: 8px; }
+.bmi-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.bmi-label { font-size: 15px; font-weight: 600; color: #666666; }
+.bmi-value { font-size: 32px; font-weight: 700; }
+.bmi-status { padding: 8px 16px; border-radius: 20px; color: #FFFFFF; font-size: 14px; font-weight: 600; }
+.latest-date { font-size: 13px; color: #888888; text-align: center; }
 
-.stat-item {
-  text-align: center;
-  padding: 16px;
-  background: #F8F9FA;
-  border-radius: 8px;
-}
+/* 그래프 & 히스토리 (가로 확장) */
+.chart-card { grid-column: span 2; }
+.chart-container { overflow-x: auto; padding: 20px 0; }
+.chart-svg { display: block; margin: 0 auto; }
+.axis-label { font-size: 12px; fill: #666666; }
+.data-label { font-size: 13px; font-weight: 600; fill: #333333; }
 
-.stat-label {
-  display: block;
-  font-size: 13px;
-  color: #888888;
-  margin-bottom: 8px;
-}
+.history-card { grid-column: span 2; }
+.history-list { display: flex; flex-direction: column; gap: 12px; max-height: 400px; overflow-y: auto; }
+.history-item { display: flex; align-items: center; justify-content: space-between; padding: 16px 24px; background: #F8F9FA; border-radius: 8px; }
+.history-stats { flex: 1; display: flex; justify-content: center; gap: 32px; flex-wrap: wrap; }
+.history-stat { font-size: 14px; color: #666666; }
+.history-date { font-size: 14px; font-weight: 700; color: #4CAF50; min-width: 100px; }
 
-.stat-value {
-  font-size: 28px;
-  font-weight: 700;
-  color: #333333;
-}
+.empty-body-info, .empty-chart, .empty-history { text-align: center; padding: 40px 20px; }
+.empty-text { font-size: 15px; color: #888888; }
 
-.stat-unit {
-  font-size: 16px;
-  font-weight: 500;
-  color: #888888;
-  margin-left: 4px;
-}
-
-.bmi-section {
-  padding: 16px;
-  background: #F8F9FA;
-  border-radius: 8px;
-}
-
-.bmi-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 12px;
-}
-
-.bmi-label {
-  font-size: 15px;
-  font-weight: 600;
-  color: #666666;
-}
-
-.bmi-value {
-  font-size: 32px;
-  font-weight: 700;
-}
-
-.bmi-status {
-  padding: 8px 16px;
-  border-radius: 20px;
-  color: #FFFFFF;
-  font-size: 14px;
-  font-weight: 600;
-  text-align: center;
-}
-
-.latest-date {
-  font-size: 13px;
-  color: #888888;
-  text-align: center;
-}
-
-.empty-body-info {
-  text-align: center;
-  padding: 40px 20px;
-}
-
-.empty-text {
-  font-size: 15px;
-  color: #888888;
-  margin-bottom: 16px;
-}
-
-/* 그래프 */
-.chart-card {
-  grid-column: span 2;
-}
-
-.chart-container {
-  overflow-x: auto;
-  padding: 20px 0;
-}
-
-.chart-svg {
-  display: block;
-  margin: 0 auto;
-}
-
-.axis-label {
-  font-size: 12px;
-  fill: #666666;
-}
-
-.data-label {
-  font-size: 13px;
-  font-weight: 600;
-  fill: #333333;
-}
-
-.empty-chart {
-  text-align: center;
-  padding: 60px 20px;
-}
-
-/* 이력 */
-.history-card {
-  grid-column: span 2;
-}
-
-.history-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  max-height: 400px;
-  overflow-y: auto;
-}
-
-.history-item {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 16px;
-  background: #F8F9FA;
-  border-radius: 8px;
-  transition: background 0.3s ease;
-}
-
-.history-item:hover {
-  background: #E8F5E9;
-}
-
-.history-date {
-  font-size: 14px;
-  font-weight: 700;
-  color: #4CAF50;
-  min-width: 100px;
-}
-
-.history-stats {
-  flex: 1;
-  display: flex;
-  gap: 16px;
-  flex-wrap: wrap;
-}
-
-.history-stat {
-  font-size: 14px;
-  color: #666666;
-}
-
-.empty-history {
-  text-align: center;
-  padding: 40px 20px;
-}
-
-/* 모달 */
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
-
-.modal-content {
-  background: #FFFFFF;
-  border-radius: 12px;
-  width: 90%;
-  max-width: 500px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
-}
-
-.modal-content.small-modal {
-  max-width: 400px;
-}
-
-.modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 24px 28px;
-  border-bottom: 1px solid #E0E0E0;
-}
-
-.modal-title {
-  font-size: 20px;
-  font-weight: 700;
-  color: #333333;
-}
-
-.modal-close {
-  width: 32px;
-  height: 32px;
-  background: transparent;
-  border: none;
-  color: #666666;
-  font-size: 24px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 6px;
-  transition: all 0.3s ease;
-}
-
-.modal-close:hover {
-  background: #F8F9FA;
-  color: #333333;
-}
-
-.modal-body {
-  padding: 28px;
-}
-
-.modal-message {
-  font-size: 16px;
-  color: #333333;
-  text-align: center;
-  margin: 8px 0;
-}
-
-.modal-footer {
-  padding: 24px 28px;
-  border-top: 1px solid #E0E0E0;
-  display: flex;
-  gap: 12px;
-  justify-content: center;
-}
-
-.modal-btn {
-  padding: 12px 32px;
-  border-radius: 8px;
-  font-size: 15px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  min-width: 100px;
-}
-
-.cancel-btn-modal {
-  background: #F5F7FA;
-  border: 1px solid #E0E0E0;
-  color: #666666;
-}
-
-.cancel-btn-modal:hover {
-  background: #E8EAF0;
-  border-color: #BDBDBD;
-  color: #333333;
-}
-
-/* 토스트 */
-.toast-message {
-  position: fixed;
-  bottom: 40px;
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 16px 24px;
-  background: #FFFFFF;
-  border-radius: 12px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-  z-index: 1100;
-  animation: slideUp 0.3s ease-out;
-}
-
-@keyframes slideUp {
-  from {
-    transform: translateX(-50%) translateY(20px);
-    opacity: 0;
-  }
-  to {
-    transform: translateX(-50%) translateY(0);
-    opacity: 1;
-  }
-}
-
-.toast-icon {
-  width: 24px;
-  height: 24px;
-  background: #4CAF50;
-  color: #FFFFFF;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 16px;
-  font-weight: 700;
-}
-
-.toast-text {
-  font-size: 15px;
-  color: #333333;
-  font-weight: 600;
-}
-
-/* 반응형 */
 @media (max-width: 968px) {
-  .grid-layout {
-    grid-template-columns: 1fr;
-  }
-
-  .chart-card,
-  .history-card {
-    grid-column: span 1;
-  }
-
-  .body-stats {
-    grid-template-columns: repeat(3, 1fr);
-  }
-
-  .nav-menu {
-    display: none;
-  }
+  .grid-layout { grid-template-columns: 1fr; }
+  .chart-card, .history-card { grid-column: span 1; }
+  .history-item { flex-direction: column; text-align: center; gap: 8px; }
 }
 </style>
