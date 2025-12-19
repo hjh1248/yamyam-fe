@@ -13,8 +13,6 @@ import PostFormView from '../views/PostFormView.vue'
 import ChallengeView from '../views/ChallengeView.vue'
 import MyPageView from '../views/MyPageView.vue'
 import FriendsView from '../views/FriendsView.vue'
-import FollowersView from '../views/FollowersView.vue'
-import FollowingView from '../views/FollowingView.vue'
 import UserProfileView from '../views/UserProfileView.vue'
 
 const router = createRouter({
@@ -103,16 +101,6 @@ const router = createRouter({
       path: '/friends',
       name: 'friends',
       component: FriendsView
-    },
-    {
-      path: '/followers',
-      name: 'followers',
-      component: FollowersView
-    },
-    {
-      path: '/following',
-      name: 'following',
-      component: FollowingView
     },
     {
       path: '/user/:id',
