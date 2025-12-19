@@ -51,7 +51,6 @@ const logout = () => {
         <router-link to="/board" :class="{ active: activePage === 'board' }">게시판</router-link>
         <router-link to="/challenge" :class="{ active: activePage === 'challenge' }">챌린지</router-link>
         <router-link to="/friends" :class="{ active: activePage === 'friends' }">친구 검색</router-link>
-        <router-link to="/mypage" :class="{ active: activePage === 'mypage' }">마이페이지</router-link>
       </nav>
 
       <div class="user-menu">
