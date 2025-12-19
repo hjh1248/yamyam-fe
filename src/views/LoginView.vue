@@ -42,9 +42,6 @@ const handleLogin = async () => {
       // userId 저장에 실패해도 로그인은 계속 진행
     }
 
-    // 환영 메시지 (선택 사항)
-    alert(`${nickname}님, 환영합니다! 🥗`)
-
     // 메인 페이지로 이동
     router.push('/main')
 

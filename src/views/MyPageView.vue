@@ -1,65 +1,61 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue' // onMounted 추가
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import AppHeader from '@/components/AppHeader.vue'
 import api from '@/util/axios'
 
 const router = useRouter()
 
-// 1. 사용자 정보 (초기값 비워두기)
+// 1. 사용자 정보
 const userInfo = ref({
   name: '',
   nickname: '',
   email: ''
 })
 
-// 2. 팔로워/팔로잉 수 (초기값 0)
+// 2. 팔로워/팔로잉 수
 const followStats = ref({
   followers: 0, 
   following: 0  
 })
 
-// 3. 신체 정보 이력 (빈 배열로 시작)
+// 3. 신체 정보 이력
 const bodySpecs = ref([])
 
 // --- [API 통신 함수들] ---
 
-// 내 정보 불러오기 (/api/users/me)
+// 내 정보 불러오기
 const fetchUserInfo = async () => {
   try {
     const response = await api.get('/api/users/me')
     const data = response.data
     
-    // 받아온 데이터 채워넣기
     userInfo.value = {
       name: data.name,
       nickname: data.nickname,
       email: data.email
     }
     
-    // 팔로우 정보도 같이 채우기
     followStats.value = {
       followers: data.followers,
       following: data.following
     }
   } catch (error) {
     console.error('내 정보 로딩 실패:', error)
-    // 401 에러(로그인 안 됨)는 axios 인터셉터가 알아서 처리해주니까 걱정 노노!
   }
 }
 
-// 신체 정보 목록 불러오기 (/api/body-specs)
+// 신체 정보 목록 불러오기
 const fetchBodySpecs = async () => {
   try {
     const response = await api.get('/api/body-specs')
-    // 백엔드에서 날짜 순서대로 정렬해주면 좋지만, 프론트에서 한 번 더 확실하게 정렬해도 됨
     bodySpecs.value = response.data.sort((a, b) => new Date(a.date) - new Date(b.date))
   } catch (error) {
     console.error('신체 정보 로딩 실패:', error)
   }
 }
 
-// 페이지가 열리자마자 데이터 가져오기!
+// 페이지 로드
 onMounted(async () => {
   await Promise.all([
     fetchUserInfo(),
@@ -67,7 +63,7 @@ onMounted(async () => {
   ])
 })
 
-// --- [기존 로직 + API 연결] ---
+// --- [기존 로직] ---
 
 // 모달 상태
 const showAddModal = ref(false)
@@ -87,10 +83,9 @@ const newBodySpec = ref({
   created_at: new Date().toISOString().split('T')[0]
 })
 
-// 최신 신체 정보 (bodySpecs가 바뀌면 자동 업데이트됨)
+// 최신 신체 정보
 const latestBodySpec = computed(() => {
   if (bodySpecs.value.length === 0) return null
-  // 날짜 내림차순 정렬 후 첫 번째꺼
   return [...bodySpecs.value].sort((a, b) => new Date(b.date) - new Date(a.date))[0]
 })
 
@@ -110,14 +105,13 @@ const bmiStatus = computed(() => {
   return { text: '비만', color: '#F44336' }
 })
 
-// 그래프 데이터 (최근 10개)
+// 그래프 데이터
 const chartData = computed(() => {
-  // 날짜 오름차순 정렬 (옛날 -> 최신)
   const sorted = [...bodySpecs.value].sort((a, b) => new Date(a.date) - new Date(b.date))
   return sorted.slice(-10)
 })
 
-// 그래프 관련 계산 (차트 그리는 로직은 데이터만 들어오면 알아서 작동함)
+// 그래프 관련 계산
 const chartWidth = 800
 const chartHeight = 300
 const chartPadding = { top: 20, right: 40, bottom: 60, left: 60 }
@@ -134,7 +128,6 @@ const weightRange = computed(() => {
   }
 })
 
-// 좌표 계산
 const getX = (index) => {
   const dataWidth = chartWidth - chartPadding.left - chartPadding.right
   return chartPadding.left + (dataWidth / (chartData.value.length - 1 || 1)) * index
@@ -146,7 +139,6 @@ const getY = (weight) => {
   return chartPadding.top + dataHeight - ((weight - weightRange.value.min) / range * dataHeight)
 }
 
-// 그래프 경로
 const chartPath = computed(() => {
   if (chartData.value.length === 0) return ''
   return chartData.value.map((d, i) => {
@@ -156,7 +148,6 @@ const chartPath = computed(() => {
   }).join(' ')
 })
 
-// Y축 눈금
 const yAxisTicks = computed(() => {
   const range = weightRange.value.max - weightRange.value.min
   const step = Math.ceil(range / 5)
@@ -171,7 +162,7 @@ const yAxisTicks = computed(() => {
   return ticks.reverse()
 })
 
-// ★ 신체 정보 추가 (API 연결)
+// 신체 정보 추가
 const handleAddBodySpec = async () => {
   if (!newBodySpec.value.height || !newBodySpec.value.weight || !newBodySpec.value.age) {
     displayToast('모든 필드를 입력해주세요')
@@ -179,7 +170,6 @@ const handleAddBodySpec = async () => {
   }
 
   try {
-    // 1. 서버에 전송
     await api.post('/api/body-specs', {
       height: parseInt(newBodySpec.value.height),
       weight: parseInt(newBodySpec.value.weight),
@@ -188,7 +178,6 @@ const handleAddBodySpec = async () => {
       created_at: newBodySpec.value.created_at
     })
 
-    // 2. 성공하면 목록 새로고침 (이게 제일 중요! 서버 데이터를 다시 받아옴)
     await fetchBodySpecs()
 
     showAddModal.value = false
@@ -213,16 +202,12 @@ const deleteBodySpec = (id) => {
   showDeleteModal.value = true
 }
 
-// ★ 신체 정보 삭제 확인 (API 연결)
+// 신체 정보 삭제 확인
 const confirmDelete = async () => {
   if (deleteTargetId.value) {
     try {
-      // 1. 서버에 삭제 요청
       await api.delete(`/api/body-specs/${deleteTargetId.value}`)
-      
-      // 2. 성공하면 목록 새로고침
       await fetchBodySpecs()
-      
       displayToast('신체 정보가 삭제되었습니다')
     } catch (error) {
       console.error(error)
@@ -243,7 +228,7 @@ const displayToast = (message) => {
   }, 3000)
 }
 
-// 모달 열기 (기존 값 채우기)
+// 모달 열기
 const openAddModal = () => {
   if (latestBodySpec.value) {
     newBodySpec.value.height = latestBodySpec.value.height.toString()
@@ -252,21 +237,23 @@ const openAddModal = () => {
   }
   showAddModal.value = true
 }
+
+// ★ 팔로우 페이지로 이동 (탭 파라미터 포함)
+const goToFollowPage = (tab) => {
+  router.push(`/follow?tab=${tab}`)
+}
 </script>
 
 <template>
   <div class="mypage-container">
-    <!-- 상단 네비게이션 -->
     <AppHeader active-page="mypage" />
 
-    <!-- 메인 콘텐츠 -->
     <main class="main-content">
       <div class="content-wrapper">
         <div class="page-header">
           <h1 class="page-title">마이페이지</h1>
         </div>
 
-        <!-- 그리드 레이아웃 -->
         <div class="grid-layout">
           <!-- 사용자 정보 카드 -->
           <div class="card user-info-card">
@@ -289,16 +276,22 @@ const openAddModal = () => {
             </div>
 
             <!-- 팔로워/팔로잉 섹션 -->
-            <div class="follow-section">
-              <div class="follow-item" @click="router.push('/followers')">
-                <div class="follow-count">{{ followStats.followers }}</div>
-                <div class="follow-label">팔로워</div>
+            <div class="follow-wrapper">
+              <div class="follow-section">
+                <div class="follow-item" @click="goToFollowPage('followers')">
+                  <div class="follow-count">{{ followStats.followers }}</div>
+                  <div class="follow-label">팔로워</div>
+                </div>
+                <div class="follow-divider"></div>
+                <div class="follow-item" @click="goToFollowPage('following')">
+                  <div class="follow-count">{{ followStats.following }}</div>
+                  <div class="follow-label">팔로잉</div>
+                </div>
               </div>
-              <div class="follow-divider"></div>
-              <div class="follow-item" @click="router.push('/following')">
-                <div class="follow-count">{{ followStats.following }}</div>
-                <div class="follow-label">팔로잉</div>
-              </div>
+              
+              <button class="view-all-btn" @click="goToFollowPage('followers')">
+                팔로우 목록 전체보기 >
+              </button>
             </div>
           </div>
 
@@ -349,7 +342,6 @@ const openAddModal = () => {
             </div>
             <div v-if="chartData.length >= 2" class="chart-container">
               <svg :width="chartWidth" :height="chartHeight" class="chart-svg">
-                <!-- 그리드 라인 -->
                 <g class="grid-lines">
                   <line
                     v-for="tick in yAxisTicks"
@@ -363,7 +355,6 @@ const openAddModal = () => {
                   />
                 </g>
 
-                <!-- Y축 -->
                 <g class="y-axis">
                   <line
                     :x1="chartPadding.left"
@@ -385,7 +376,6 @@ const openAddModal = () => {
                   </text>
                 </g>
 
-                <!-- X축 -->
                 <g class="x-axis">
                   <line
                     :x1="chartPadding.left"
@@ -407,7 +397,6 @@ const openAddModal = () => {
                   </text>
                 </g>
 
-                <!-- 데이터 라인 -->
                 <path
                   :d="chartPath"
                   fill="none"
@@ -417,7 +406,6 @@ const openAddModal = () => {
                   stroke-linejoin="round"
                 />
 
-                <!-- 데이터 포인트 -->
                 <g class="data-points">
                   <circle
                     v-for="(d, i) in chartData"
@@ -675,16 +663,27 @@ const openAddModal = () => {
 }
 
 /* 팔로워/팔로잉 섹션 */
+.follow-wrapper {
+  background: #F8F9FA;
+  border-radius: 8px;
+  margin-top: 8px;
+  padding: 16px; /* 안쪽 여백 */
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* 기존 follow-section (배경색 제거, 패딩 조정) */
 .follow-section {
   display: flex;
   align-items: center;
   justify-content: space-around;
-  padding: 20px;
-  background: #F8F9FA;
+  /* background: #F8F9FA;  <- 기존 배경색 삭제 (부모인 wrapper로 이동) */
+  /* padding: 20px;       <- 기존 패딩 삭제 */
   border-radius: 8px;
-  margin-top: 8px;
 }
 
+/* 기존 아이템 스타일 유지 */
 .follow-item {
   display: flex;
   flex-direction: column;
@@ -692,17 +691,17 @@ const openAddModal = () => {
   gap: 8px;
   cursor: pointer;
   transition: all 0.3s ease;
-  padding: 8px 16px;
+  padding: 4px 16px; /* 패딩 살짝 줄임 */
   border-radius: 8px;
 }
 
 .follow-item:hover {
-  background: #E8F5E9;
+  background: #E8F5E9; /* 호버 효과 유지 */
   transform: translateY(-2px);
 }
 
 .follow-count {
-  font-size: 28px;
+  font-size: 24px; /* 숫자가 너무 크면 살짝 줄여도 됨 */
   font-weight: 700;
   color: #4CAF50;
 }
@@ -715,8 +714,27 @@ const openAddModal = () => {
 
 .follow-divider {
   width: 1px;
-  height: 40px;
+  height: 30px; /* 높이 살짝 조정 */
   background: #E0E0E0;
+}
+
+.view-all-btn {
+  width: 100%;
+  padding: 10px 0;
+  background-color: #FFFFFF;
+  border: 1px solid #E0E0E0;
+  border-radius: 6px;
+  color: #555555;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.view-all-btn:hover {
+  background-color: #4CAF50;
+  border-color: #4CAF50;
+  color: #FFFFFF;
 }
 
 /* 신체 정보 */
@@ -870,8 +888,9 @@ const openAddModal = () => {
 .history-item {
   display: flex;
   align-items: center;
+  justify-content: space-between; /* 양끝 정렬로 변경 */
   gap: 16px;
-  padding: 16px;
+  padding: 16px 24px; /* 좌우 여백을 조금 더 줌 */
   background: #F8F9FA;
   border-radius: 8px;
   transition: background 0.3s ease;
@@ -891,7 +910,8 @@ const openAddModal = () => {
 .history-stats {
   flex: 1;
   display: flex;
-  gap: 16px;
+  justify-content: center; /* 정보들을 가운데로 모으거나, space-around로 분산 가능 */
+  gap: 32px; /* 정보 사이 간격을 좀 더 넓힘 */
   flex-wrap: wrap;
 }
 
@@ -1175,6 +1195,10 @@ const openAddModal = () => {
   font-weight: 600;
 }
 
+.history-card {
+  grid-column: span 2; /* 이 속성을 추가하면 가로로 꽉 차게 됨 */
+}
+
 /* 반응형 */
 @media (max-width: 968px) {
   .grid-layout {
@@ -1182,7 +1206,7 @@ const openAddModal = () => {
   }
 
   .chart-card {
-    grid-column: span 1;
+    grid-column: span 2;
   }
 
   .body-stats {

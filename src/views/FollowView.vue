@@ -1,17 +1,33 @@
 <template>
-  <div class="followers-view">
+  <div class="follow-view">
     <AppHeader active-page="" />
 
     <main class="main-content">
       <div class="container">
         <div class="header-section">
           <button @click="goBack" class="back-btn">← 돌아가기</button>
-          <h1 class="page-title">팔로워</h1>
+          <h1 class="page-title">팔로우 관리</h1>
         </div>
 
-        <div v-if="followers.length > 0" class="followers-section">
-          <p class="count-text">{{ followers.length }}명의 팔로워</p>
-          <div class="user-list">
+        <!-- 탭 메뉴 -->
+        <div class="tab-menu">
+          <button 
+            :class="['tab-btn', { active: activeTab === 'followers' }]"
+            @click="activeTab = 'followers'"
+          >
+            팔로워 ({{ followers.length }})
+          </button>
+          <button 
+            :class="['tab-btn', { active: activeTab === 'following' }]"
+            @click="activeTab = 'following'"
+          >
+            팔로잉 ({{ following.length }})
+          </button>
+        </div>
+
+        <!-- 팔로워 탭 -->
+        <div v-if="activeTab === 'followers'" class="tab-content">
+          <div v-if="followers.length > 0" class="user-list">
             <div v-for="user in followers" :key="user.id" class="user-card">
               <div class="user-info" @click="router.push(`/user/${user.id}`)">
                 <div class="user-avatar">
@@ -40,10 +56,38 @@
               </button>
             </div>
           </div>
+
+          <div v-else class="empty-state">
+            <p>아직 나를 팔로우하는 사람이 없습니다.</p>
+          </div>
         </div>
 
-        <div v-else class="empty-state">
-          <p>아직 나를 팔로우하는 사람이 없습니다.</p>
+        <!-- 팔로잉 탭 -->
+        <div v-if="activeTab === 'following'" class="tab-content">
+          <div v-if="following.length > 0" class="user-list">
+            <div v-for="user in following" :key="user.id" class="user-card">
+              <div class="user-info" @click="router.push(`/user/${user.id}`)">
+                <div class="user-avatar">
+                  {{ user.name.charAt(0) }}
+                </div>
+                <div class="user-details">
+                  <h3 class="user-name">{{ user.name }}</h3>
+                  <p class="user-nickname">@{{ user.nickname }}</p>
+                  <p class="user-meta">{{ user.email }}</p>
+                </div>
+              </div>
+              <button
+                @click="unfollowFromFollowing(user)"
+                class="btn btn-unfollow"
+              >
+                언팔로우
+              </button>
+            </div>
+          </div>
+
+          <div v-else class="empty-state">
+            <p>팔로잉 중인 사용자가 없습니다.</p>
+          </div>
         </div>
       </div>
     </main>
@@ -59,20 +103,23 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import AppHeader from '@/components/AppHeader.vue'
-import api from '@/util/axios' // ★ Axios 가져오기
+import api from '@/util/axios'
 
 const router = useRouter()
+const route = useRoute()
 
 // State
-const followers = ref([]) // 서버에서 받아올 데이터
+const activeTab = ref('followers') // 기본 탭
+const followers = ref([])
+const following = ref([])
 
 // Toast
 const showToast = ref(false)
 const toastMessage = ref('')
 
-// ★ 데이터 불러오기 (API)
+// 팔로워 목록 불러오기
 const fetchFollowers = async () => {
   try {
     const response = await api.get('/api/follows/followers')
@@ -83,17 +130,34 @@ const fetchFollowers = async () => {
   }
 }
 
-// 화면 켜지자마자 실행
-onMounted(() => {
-  fetchFollowers()
+// 팔로잉 목록 불러오기
+const fetchFollowing = async () => {
+  try {
+    const response = await api.get('/api/follows/following')
+    following.value = response.data
+  } catch (error) {
+    console.error(error)
+    displayToast('팔로잉 목록을 불러오지 못했습니다.')
+  }
+}
+
+// 화면 로드 시 데이터 가져오기 + 쿼리 파라미터로 탭 설정
+onMounted(async () => {
+  // URL 쿼리로 탭 결정 (예: /follow?tab=following)
+  if (route.query.tab === 'following') {
+    activeTab.value = 'following'
+  }
+  
+  await Promise.all([
+    fetchFollowers(),
+    fetchFollowing()
+  ])
 })
 
-// ★ 팔로우 (맞팔하기)
+// 팔로우 (맞팔하기)
 const followUser = async (user) => {
   try {
     await api.post(`/api/follows/${user.id}`)
-    
-    // 화면 즉시 갱신
     user.isFollowing = true
     displayToast(`${user.name}님을 팔로우했습니다.`)
   } catch (error) {
@@ -102,13 +166,25 @@ const followUser = async (user) => {
   }
 }
 
-// ★ 언팔로우 (맞팔 취소)
+// 언팔로우 (팔로워 탭에서)
 const unfollowUser = async (user) => {
   try {
     await api.delete(`/api/follows/${user.id}`)
-    
-    // 화면 즉시 갱신
     user.isFollowing = false
+    displayToast(`${user.name}님을 언팔로우했습니다.`)
+  } catch (error) {
+    console.error(error)
+    displayToast('언팔로우 실패')
+  }
+}
+
+// 언팔로우 (팔로잉 탭에서 - 목록에서 제거)
+const unfollowFromFollowing = async (user) => {
+  if (!confirm(`${user.name}님을 언팔로우 하시겠습니까?`)) return
+
+  try {
+    await api.delete(`/api/follows/${user.id}`)
+    following.value = following.value.filter(u => u.id !== user.id)
     displayToast(`${user.name}님을 언팔로우했습니다.`)
   } catch (error) {
     console.error(error)
@@ -130,19 +206,17 @@ const goBack = () => {
 </script>
 
 <style scoped>
-/* Reset */
 * {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
 }
 
-.followers-view {
+.follow-view {
   min-height: 100vh;
   background: #F5F7FA;
 }
 
-/* Main Content */
 .main-content {
   max-width: 1200px;
   margin: 0 auto;
@@ -184,16 +258,50 @@ const goBack = () => {
   color: #333333;
 }
 
-/* Followers Section */
-.followers-section {
-  margin-top: 20px;
+/* 탭 메뉴 */
+.tab-menu {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 30px;
+  border-bottom: 2px solid #E0E0E0;
 }
 
-.count-text {
+.tab-btn {
+  padding: 12px 30px;
+  background: none;
+  border: none;
   font-size: 16px;
-  color: #666666;
-  margin-bottom: 20px;
-  font-weight: 500;
+  font-weight: 600;
+  color: #999999;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -2px;
+}
+
+.tab-btn:hover {
+  color: #4CAF50;
+}
+
+.tab-btn.active {
+  color: #4CAF50;
+  border-bottom-color: #4CAF50;
+}
+
+/* 탭 콘텐츠 */
+.tab-content {
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .user-list {
@@ -358,20 +466,17 @@ const goBack = () => {
 
 /* Responsive */
 @media (max-width: 768px) {
-  .header-content {
-    padding: 0 20px;
-  }
-
-  .nav {
-    display: none;
-  }
-
   .container {
     padding: 20px;
   }
 
   .page-title {
     font-size: 24px;
+  }
+
+  .tab-btn {
+    padding: 10px 20px;
+    font-size: 14px;
   }
 
   .user-card {

@@ -52,9 +52,9 @@
                 <button 
                   v-if="currentUserId === challenge.creatorId && challenge.challengeStatus !== 'DELETED'" 
                   @click.stop="deleteChallenge(challenge)" 
-                  class="btn-delete-icon" 
+                  class="btn-delete" 
                   title="내가 만든 챌린지 삭제">
-                  🗑️
+                  삭제
                 </button>
               </div>
 
@@ -95,9 +95,9 @@
                 <button 
                   v-if="currentUserId === challenge.creatorId" 
                   @click.stop="deleteChallenge(challenge)" 
-                  class="btn-delete-icon" 
+                  class="btn-delete" 
                   title="내가 만든 챌린지 삭제">
-                  🗑️
+                  삭제
                 </button>
               </div>
               
@@ -172,7 +172,7 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import AppHeader from '@/components/AppHeader.vue' // ★ 헤더 컴포넌트 임포트
+import AppHeader from '@/components/AppHeader.vue'
 import api from '@/util/axios'
 
 const router = useRouter()
@@ -298,9 +298,8 @@ onMounted(async () => {
 }
 
 .container {
-  max-width: 1400px; /* FriendsView와 폭 맞춤 */
+  max-width: 1400px;
   margin: 0 auto;
-  /* background: #FFFFFF; <--- 컨테이너 전체 배경색을 원하면 주석 해제, 지금은 카드형이라 뺌 */ 
 }
 
 .page-header {
@@ -385,10 +384,51 @@ onMounted(async () => {
 .progress-text { font-size: 12px; color: #666; }
 
 /* 버튼 */
-.btn-join { width: 100%; padding: 12px; background: #4CAF50; color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; }
-.btn-quit { width: 100%; padding: 10px; background: white; border: 1px solid #FFCDD2; color: #E53935; border-radius: 8px; cursor: pointer; }
-.btn-delete-icon { background: none; border: none; font-size: 18px; cursor: pointer; color: #999; }
-.btn-delete-icon:hover { color: #E53935; }
+.btn-join { 
+  width: 100%; 
+  padding: 12px; 
+  background: #4CAF50; 
+  color: white; 
+  border: none; 
+  border-radius: 8px; 
+  font-weight: 600; 
+  cursor: pointer; 
+}
+
+.btn-quit { 
+  width: 100%; 
+  padding: 10px; 
+  background: white; 
+  border: 1px solid #FFCDD2; 
+  color: #E53935; 
+  border-radius: 8px; 
+  cursor: pointer; 
+}
+
+.btn-delete { 
+  background: linear-gradient(135deg, #FF6B6B 0%, #E53935 100%); 
+  color: white; 
+  border: none; 
+  padding: 6px 16px; 
+  border-radius: 6px; 
+  font-size: 13px; 
+  font-weight: 600; 
+  cursor: pointer; 
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(229, 57, 53, 0.2);
+}
+
+.btn-delete:hover { 
+  transform: translateY(-2px); 
+  box-shadow: 0 4px 12px rgba(229, 57, 53, 0.3);
+  background: linear-gradient(135deg, #E53935 0%, #C62828 100%);
+}
+
+.participants-count {
+  font-size: 13px;
+  color: #666;
+  font-weight: 600;
+}
 
 /* 상태 */
 .deleted-card { background: #f9f9f9; opacity: 0.9; border: 1px solid #ddd; }
@@ -409,10 +449,13 @@ onMounted(async () => {
 
 .btn-confirm { padding: 10px 20px; background: #4CAF50; color: white; border: none; border-radius: 6px; cursor: pointer; }
 .btn-cancel { padding: 10px 20px; background: #f5f5f5; color: #333; border: none; border-radius: 6px; cursor: pointer; }
+.confirm-btn { padding: 10px 20px; background: #4CAF50; color: white; border: none; border-radius: 6px; cursor: pointer; }
+.cancel-btn { padding: 10px 20px; background: #f5f5f5; color: #333; border: none; border-radius: 6px; cursor: pointer; }
 .quit-btn { padding: 10px 20px; background: #F44336; color: white; border: none; border-radius: 6px; cursor: pointer; }
 .red-text { color: #F44336; margin-top: 8px; font-size: 14px; }
+.confirm-message { margin-top: 10px; font-size: 14px; color: #666; }
 
-/* 토스트 (FriendsView와 동일) */
+/* 토스트 */
 .toast {
   position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
   background: #FFFFFF; padding: 16px 24px; border-radius: 10px;
