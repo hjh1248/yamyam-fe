@@ -39,7 +39,8 @@
           <div v-if="myChallenges.length > 0" class="challenge-list">
             <div v-for="challenge in myChallenges" :key="challenge.id" 
                 class="challenge-card"
-                :class="{ 'deleted-card': challenge.challengeStatus === 'DELETED' }">
+                :class="{ 'deleted-card': challenge.challengeStatus === 'DELETED' }"
+                @click="goToDetail(challenge.id)">
               
               <div class="card-header">
                 <span v-if="challenge.challengeStatus === 'DELETED'" class="status-badge deleted">삭제됨</span>
@@ -59,6 +60,8 @@
               </div>
 
               <h3 class="challenge-title">{{ challenge.title }}</h3>
+
+              <p class="challenge-desc">{{ challenge.description }}</p>
 
               <div v-if="challenge.challengeStatus === 'DELETED'" class="deleted-notice">
                 ⚠️ 개최자에 의해 종료된 챌린지입니다.<br>목록에서 제거해주세요.
@@ -88,7 +91,9 @@
           <h2 class="section-title">참여 가능한 챌린지</h2>
           
           <div v-if="availableChallenges.length > 0" class="challenge-list">
-            <div v-for="challenge in availableChallenges" :key="challenge.id" class="challenge-card available">
+            <div v-for="challenge in availableChallenges" :key="challenge.id" 
+              class="challenge-card available"
+              @click="goToDetail(challenge.id)">
               <div class="card-header">
                 <span class="participants-count">👥 {{ challenge.participants }}명 참여중</span>
                 
@@ -282,6 +287,11 @@ onMounted(async () => {
     await fetchUserInfo()
     await fetchChallenges()
 })
+
+const goToDetail = (id) => {
+  // router/index.js에 등록된 경로와 맞춰주세요 (예: /challenge/:id)
+  router.push(`/challenge/${id}`)
+}
 </script>
 
 <style scoped>
@@ -428,6 +438,94 @@ onMounted(async () => {
   font-size: 13px;
   color: #666;
   font-weight: 600;
+}
+
+.challenge-card {
+  background: white; 
+  border-radius: 12px; 
+  padding: 24px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06); 
+  transition: transform 0.2s;
+  display: flex; 
+  flex-direction: column;
+  cursor: pointer; /* ★ 추가: 클릭 가능하다는 표시 */
+}
+
+.challenge-desc {
+  font-size: 14px;
+  color: #666;
+  
+  /* 간격 조절: 아래 여백을 16px -> 12px로 줄임 */
+  margin-bottom: 12px; 
+  line-height: 1.5;
+
+  /* ★ 핵심 수정: flex-grow 제거 */
+  flex-grow: 0; 
+  
+  /* 말줄임표 처리 */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  
+  /* 최소 높이 유지 (레이아웃 통일감) */
+  min-height: 42px; 
+}
+
+/* --- [2] 진행바 컨테이너 (위아래 간격 조절) --- */
+.progress-container {
+  /* 설명과 너무 붙지 않으면서도 멀지 않게 */
+  margin-top: 0; 
+  margin-bottom: 16px;
+  
+  /* 혹시 모를 flex-grow 방지 */
+  flex-shrink: 0; 
+}
+
+/* --- [2] 참여하기 버튼 (초록색 채움 -> 진한 초록 + 그림자) --- */
+.btn-join { 
+  width: 100%; 
+  padding: 12px; 
+  background: #4CAF50; 
+  color: white; 
+  border: none; 
+  border-radius: 8px; 
+  font-weight: 600; 
+  cursor: pointer;
+  transition: all 0.2s ease; /* 부드러운 전환 */
+}
+
+.btn-join:hover {
+  background: #43A047; /* 색상 진하게 */
+  transform: translateY(-2px); /* 살짝 위로 뜸 */
+  box-shadow: 0 4px 12px rgba(76, 175, 80, 0.4); /* 초록색 그림자 */
+}
+
+/* --- [3] 포기하기 버튼 (흰색 배경 -> 빨간색 채움) --- */
+.btn-quit { 
+  width: 100%; 
+  padding: 10px; 
+  background: white; 
+  border: 1px solid #FFCDD2; 
+  color: #E53935; 
+  border-radius: 8px; 
+  font-weight: 600; /* 글자 두껍게 */
+  cursor: pointer; 
+  transition: all 0.2s ease;
+}
+
+.btn-quit:hover {
+  background: #E53935; /* 배경을 빨갛게 */
+  color: white;        /* 글자는 하얗게 */
+  border-color: #E53935;
+  box-shadow: 0 4px 12px rgba(229, 57, 53, 0.3); /* 빨간색 그림자 */
+  transform: translateY(-1px);
+}
+
+.challenge-section {
+  margin-bottom: 40px; /* 이 숫자를 늘리면 간격이 더 넓어집니다 */
 }
 
 /* 상태 */

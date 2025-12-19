@@ -11,7 +11,7 @@ import BoardView from '../views/BoardView.vue'
 import PostDetailView from '../views/PostDetailView.vue'
 import PostFormView from '../views/PostFormView.vue'
 import ChallengeView from '../views/ChallengeView.vue'
-import MyPageView from '../views/MyPageView.vue'
+import ChallengeDetailView from '../views/ChallengeDetailView.vue'
 import FriendsView from '../views/FriendsView.vue'
 import UserProfileView from '../views/UserProfileView.vue'
 
@@ -93,9 +93,9 @@ const router = createRouter({
       component: ChallengeView
     },
     {
-      path: '/mypage',
-      name: 'mypage',
-      component: MyPageView
+      path: '/challenge/:id',
+      name: 'challenge-detail',
+      component: ChallengeDetailView
     },
     {
       path: '/friends',

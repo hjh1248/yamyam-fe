@@ -724,9 +724,6 @@ onMounted(() => Promise.all([fetchUserInfo(), fetchBodySpecs(), fetchTodayMeals(
 .empty-chart { text-align: center; padding: 40px; color: #888; }
 
 /* 4. 신체 이력 (MyPage 스타일 복구) */
-.history-card { 
-  /* 그리드 레이아웃 상 위치 */
-}
 
 .history-list {
   display: flex;
