@@ -12,6 +12,7 @@ import PostDetailView from '../views/PostDetailView.vue'
 import PostFormView from '../views/PostFormView.vue'
 import ChallengeView from '../views/ChallengeView.vue'
 import ChallengeDetailView from '../views/ChallengeDetailView.vue'
+import ChallengeListView from '@/views/ChallengeListView.vue'
 import FriendsView from '../views/FriendsView.vue'
 import UserProfileView from '../views/UserProfileView.vue'
 
@@ -96,6 +97,11 @@ const router = createRouter({
       path: '/challenge/:id',
       name: 'challenge-detail',
       component: ChallengeDetailView
+    },
+    {
+    path: '/challenges', // 경로 (기존 /challenge와 겹치면 안 됨)
+      name: 'ChallengeList',
+      component: ChallengeListView
     },
     {
       path: '/friends',

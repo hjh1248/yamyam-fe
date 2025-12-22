@@ -88,7 +88,13 @@
         </section>
 
         <section class="challenge-section">
-          <h2 class="section-title">참여 가능한 챌린지</h2>
+          <div class="section-header-row">
+            <h2 class="section-title">참여 가능한 챌린지</h2>
+            
+            <button @click="router.push('/challenges')" class="btn-link">
+              전체 챌린지 라운지 <span class="arrow">→</span>
+            </button>
+          </div>
           
           <div v-if="availableChallenges.length > 0" class="challenge-list">
             <div v-for="challenge in availableChallenges" :key="challenge.id" 
@@ -553,6 +559,42 @@ const goToDetail = (id) => {
 .red-text { color: #F44336; margin-top: 8px; font-size: 14px; }
 .confirm-message { margin-top: 10px; font-size: 14px; color: #666; }
 
+.section-header-row {
+  display: flex;
+  justify-content: space-between; /* 양 끝 정렬 */
+  align-items: flex-end;          /* 텍스트 라인 맞춤 */
+  margin-bottom: 20px;
+}
+
+/* 제목 마진 제거 (헤더 로우에서 간격 처리함) */
+.section-header-row .section-title {
+  margin-bottom: 0;
+}
+
+/* [수정] 링크 버튼 스타일 (목록으로 버튼과 동일) */
+.btn-link {
+  background: none; 
+  border: none; 
+  font-size: 15px;      /* 디테일 뷰와 같은 크기 */
+  font-weight: 600;     /* 굵기 통일 */
+  color: #666;          /* 색상 통일 */
+  cursor: pointer; 
+  display: flex; 
+  align-items: center; 
+  gap: 6px;             /* 텍스트와 화살표 간격 */
+  transition: color 0.2s;
+  padding: 4px 0;       /* 클릭 영역 미세 조정 */
+}
+
+.btn-link:hover { 
+  color: #333;          /* 호버 시 진해짐 */
+}
+
+.btn-link .arrow {
+  font-size: 18px;      /* 화살표 크기 */
+  padding-bottom: 2px;  /* 높이 미세 보정 */
+}
+
 /* 토스트 */
 .toast {
   position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
@@ -563,4 +605,5 @@ const goToDetail = (id) => {
 .toast-message { color: #333; font-weight: 500; }
 .slideUp-enter-active { animation: slideUp 0.3s ease-out; }
 @keyframes slideUp { from { transform: translate(-50%, 20px); opacity: 0; } to { transform: translate(-50%, 0); opacity: 1; } }
+
 </style>
