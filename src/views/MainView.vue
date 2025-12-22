@@ -30,7 +30,6 @@ const newBodySpec = ref({
   created_at: new Date().toISOString().split('T')[0]
 })
 
-// [수정] 챌린지 데이터 (실제 데이터용)
 const myChallenges = ref([])
 
 const showToast = ref(false)
@@ -41,10 +40,15 @@ const toastMessage = ref('')
 // ==========================================
 
 const calculateDday = (endDate) => {
-    if (!endDate) return 0;
-    const diff = new Date(endDate) - new Date();
-    const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
-    return days >= 0 ? days : 0;
+  if (!endDate) return 0;
+  const diff = new Date(endDate) - new Date();
+  const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
+  return days >= 0 ? days : 0;
+}
+
+// [추가] 챌린지 상세 페이지 이동
+const goToChallengeDetail = (id) => {
+  router.push(`/challenge/${id}`)
 }
 
 const mealTypeToKorean = { breakfast: '아침', lunch: '점심', dinner: '저녁', snack: '간식' }
@@ -411,7 +415,11 @@ onMounted(() => Promise.all([fetchUserInfo(), fetchBodySpecs(), fetchTodayMeals(
               <router-link to="/challenge" class="view-all">전체보기</router-link>
             </div>
             <div v-if="myChallenges.length > 0" class="challenge-list">
-              <div v-for="challenge in myChallenges" :key="challenge.id" class="challenge-item">
+              <div v-for="challenge in myChallenges" 
+                   :key="challenge.id" 
+                   class="challenge-item"
+                   @click="goToChallengeDetail(challenge.id)">
+                   
                 <div class="challenge-info">
                   <div class="challenge-header-row">
                     <h3 class="challenge-title">{{ challenge.title }}</h3>
@@ -797,6 +805,7 @@ onMounted(() => Promise.all([fetchUserInfo(), fetchBodySpecs(), fetchTodayMeals(
 .challenge-item { 
   background: #F8F9FA; padding: 16px; border-radius: 8px; 
   transition: transform 0.2s ease;
+  cursor: pointer; /* ★ [수정] 클릭 커서 추가 */
 }
 .challenge-item:hover { transform: translateX(4px); background: #E8F5E9; }
 
