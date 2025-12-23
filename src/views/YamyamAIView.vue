@@ -532,19 +532,24 @@ onMounted(() => {
             </div>
           </div>
           <div class="daily-list">
-            <h4>📅 일일 식단 목록</h4>
-            <div class="list-actions" v-if="currentPlanDailyDiets.length > 0">
-              <button @click="toggleAll('diet', currentPlanDailyDiets)">
+            <div class="list-header-row">
+              <h4>📅 일일 식단 목록</h4>
+              
+              <button v-if="currentPlanDailyDiets.length > 0" 
+                      class="header-text-btn"
+                      @click="toggleAll('diet', currentPlanDailyDiets)">
                 {{ isCurrentListAllSelected('diet', currentPlanDailyDiets) ? '전체 해제' : '전체 선택' }}
               </button>
             </div>
+
             <div class="scroll-box">
               <div v-if="!selectedPlanId" class="empty-msg center">좌측에서 식단 계획을 선택해주세요.</div>
               <div v-else-if="currentPlanDailyDiets.length === 0" class="empty-msg center">해당 계획에 등록된 식단이 없습니다.</div>
+              
               <div v-else v-for="diet in currentPlanDailyDiets" :key="diet.dailyDietId || diet.id"
-                   class="daily-item"
-                   :class="{ selected: selectedDailyDietId === (diet.dailyDietId || diet.id), active: attachments.diet.includes(diet.dailyDietId || diet.id) }"
-                   @click="fetchFoodsByDailyDiet(diet.dailyDietId || diet.id)">
+                  class="daily-item"
+                  :class="{ selected: selectedDailyDietId === (diet.dailyDietId || diet.id), active: attachments.diet.includes(diet.dailyDietId || diet.id) }"
+                  @click="fetchFoodsByDailyDiet(diet.dailyDietId || diet.id)">
                 <div class="daily-info">
                   <div class="daily-header">
                     <span class="diet-date">{{ diet.date }}</span>
@@ -553,7 +558,7 @@ onMounted(() => {
                   <span class="diet-cal">총 {{ calculateTotalCal(diet) }}kcal</span>
                 </div>
                 <div class="checkbox" :class="{ checked: attachments.diet.includes(diet.dailyDietId || diet.id) }"
-                     @click.stop="toggleSelection('diet', diet.dailyDietId || diet.id)"></div>
+                    @click.stop="toggleSelection('diet', diet.dailyDietId || diet.id)"></div>
               </div>
             </div>
           </div>
@@ -818,11 +823,15 @@ textarea:focus { border-color: #4CAF50; }
 /* [NEW] 첨부 파일 미리보기 영역 레이아웃 */
 .attachment-preview { 
   display: flex; 
-  justify-content: space-between; /* 양끝 정렬 */
+  gap: 6px; 
+  margin-bottom: 8px;
+  font-size: 11px;
   align-items: center;
-  margin-bottom: 8px; 
+  
+  /* 기존: justify-content: space-between; (이게 원인!) */
+  /* 변경: 왼쪽부터 차곡차곡 쌓이게 */
+  justify-content: flex-start; 
 }
-.badges { display: flex; gap: 6px; }
 
 /* [NEW] 전체 초기화 버튼 스타일 */
 .reset-all-btn {
@@ -843,6 +852,45 @@ textarea:focus { border-color: #4CAF50; }
   background: #fff;
   display: flex;
   justify-content: flex-end;
+}
+
+.list-header-row {
+  position: relative;           /* 내부 버튼의 absolute 기준점 */
+  display: flex;
+  justify-content: center;      /* h4 제목을 정중앙에 배치 */
+  align-items: center;
+  padding: 15px;
+  background: #f0f0f0;
+  border-bottom: 1px solid #eee;
+  min-height: 48px;             /* 높이 고정 (레이아웃 틀어짐 방지) */
+}
+
+/* 제목 스타일 */
+.list-header-row h4 {
+  margin: 0;
+  padding: 0;
+  background: none;
+  border: none;
+  font-size: 14px;
+  color: #666;
+}
+
+/* [UPDATE] 버튼: 오른쪽 끝에 절대 위치로 고정 */
+.header-text-btn {
+  position: absolute;           /* 흐름에서 벗어나서 */
+  right: 15px;                  /* 오른쪽 끝(패딩만큼)에 붙임 */
+  background: none;
+  border: none;
+  font-size: 12px;
+  color: #4CAF50;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: background 0.2s;
+}
+.header-text-btn:hover {
+  background: rgba(76, 175, 80, 0.1);
 }
 
 @media (max-width: 768px) {
