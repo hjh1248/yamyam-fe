@@ -180,17 +180,19 @@ const toggleSelection = (category, id) => {
 }
 
 const toggleAll = (category, sourceList) => {
-  // 소스 리스트에서 ID 추출 (객체 구조에 따라 id 또는 dailyDietId)
+  if (!sourceList || sourceList.length === 0) return
+
+  // 소스 리스트에서 ID 추출 (식단은 dailyDietId, 나머지는 id)
   const allIds = sourceList.map(item => category === 'diet' ? (item.dailyDietId || item.id) : item.id)
   
-  // 이미 다 선택되어 있으면 해제, 아니면 전체 선택 (현재 보여지는 리스트 기준)
-  const currentSelected = attachments.value[category].filter(id => allIds.includes(id))
+  // 현재 선택된 것들 중 이 리스트에 포함된 개수 확인
+  const currentSelectedInList = attachments.value[category].filter(id => allIds.includes(id))
   
-  if (currentSelected.length === allIds.length) {
-    // 현재 리스트에 있는 것들만 해제
+  if (currentSelectedInList.length === allIds.length) {
+    // 전체 해제: 현재 리스트에 있는 ID들만 제거
     attachments.value[category] = attachments.value[category].filter(id => !allIds.includes(id))
   } else {
-    // 현재 리스트에 있는 것들을 추가 (중복 방지)
+    // 전체 선택: 현재 리스트 ID들을 합침 (중복 제거)
     const newSelection = new Set([...attachments.value[category], ...allIds])
     attachments.value[category] = Array.from(newSelection)
   }
@@ -289,24 +291,28 @@ const sendMessage = async (text = null) => {
   const content = text || userInput.value
   if (!content.trim() || isLoading.value) return
 
+  // 1. 화면에는 내가 쓴 질문만 보여줌
   messages.value.push({ role: 'user', content: content })
   userInput.value = ''
   scrollToBottom()
   isLoading.value = true
   
   try {
-    const fullPrompt = `
-      ${contextString.value ? `[참고 정보]\n${contextString.value}\n----------------\n` : ''}
-      ${content}
-    `
-    // 식단 ID 목록 등 메타데이터를 함께 보낼 수도 있음
-    const res = await api.post('/api/ai/chat', {
-        userId: myUserInfo.value ? myUserInfo.value.id : 0, 
-        message: fullPrompt,
-        // 필요하다면 첨부파일 ID들을 별도 필드로 전송
-        // attachmentIds: attachments.value 
-    })
+    // 2. 백엔드 DTO(ChatRequest)에 맞게 데이터 구성
+    const payload = {
+      content: content,  // 질문 내용
+      bodySpecIds: attachments.value.body,      // 신체 정보 ID 리스트
+      dailyDietIds: attachments.value.diet,     // 식단 ID 리스트
+      challengeIds: attachments.value.challenge // 챌린지 ID 리스트
+    }
+
+    // 3. API 호출 (URL 수정: /api/ai/chat -> /api/chat)
+    // userId는 보통 헤더(토큰)로 처리하므로 body에서 제외 (백엔드의 @LoginUser가 처리)
+    const res = await api.post('/api/chat', payload)
+    
+    // 4. 응답 처리
     messages.value.push({ role: 'assistant', content: res.data })
+
   } catch (e) {
     messages.value.push({ role: 'assistant', content: '오류가 발생했습니다. 다시 시도해주세요.' })
     console.error(e)
@@ -322,22 +328,71 @@ const scrollToBottom = () => {
   })
 }
 
+const scrollContainer = ref(null)
+const isDragging = ref(false)
+const startX = ref(0)
+const scrollLeft = ref(0)
+
+const resetAllAttachments = () => {
+  attachments.value = { body: [], diet: [], challenge: [] }
+}
+
+const isCurrentListAllSelected = (category, sourceList) => {
+  if (!sourceList || sourceList.length === 0) return false
+  const allIds = sourceList.map(item => category === 'diet' ? (item.dailyDietId || item.id) : item.id)
+  const selected = attachments.value[category].filter(id => allIds.includes(id))
+  return selected.length === allIds.length && allIds.length > 0
+}
+
+const startDrag = (e) => {
+  isDragging.value = true
+  startX.value = e.pageX - scrollContainer.value.offsetLeft
+  scrollLeft.value = scrollContainer.value.scrollLeft
+}
+
+const stopDrag = () => {
+  isDragging.value = false
+}
+
+const onDrag = (e) => {
+  if (!isDragging.value) return
+  e.preventDefault() // 텍스트 선택 방지
+  const x = e.pageX - scrollContainer.value.offsetLeft
+  const walk = (x - startX.value) * 1.5 // 스크롤 속도 조절 (1.5배 빠르게)
+  scrollContainer.value.scrollLeft = scrollLeft.value - walk
+}
+
+const hasAnySelection = computed(() => {
+  return attachments.value.body.length > 0 || 
+         attachments.value.diet.length > 0 || 
+         attachments.value.challenge.length > 0
+})
+
 onMounted(() => {
   fetchBasicData()
 })
 </script>
 
 <template>
-  <div class="ai-container">
+  <div class="ai-container yamyam-ai-view">
     <AppHeader active-page="ai" />
 
     <div class="ai-layout">
       <main class="chat-section">
         <div class="chat-header">
           <h2>🎓 쩝쩝교수 AI</h2>
-          <button class="sidebar-toggle" @click="showSidebar = !showSidebar">
-            {{ showSidebar ? '패널 닫기' : '패널 열기' }}
-          </button>
+          
+          <div class="header-actions">
+            <transition name="fade">
+              <button v-if="hasAnySelection" class="reset-header-btn" @click="resetAllAttachments">
+                <span class="reset-icon">⟳</span> 선택 초기화
+              </button>
+            </transition>
+
+            <button class="sidebar-toggle" @click="showSidebar = !showSidebar">
+              {{ showSidebar ? '데이터 숨기기' : '데이터 첨부하기' }}
+            </button>
+          </div>
         </div>
 
         <div class="chat-window" ref="chatContainer">
@@ -354,7 +409,13 @@ onMounted(() => {
         </div>
 
         <div class="suggestion-area">
-          <div class="suggestion-scroll">
+          <div class="suggestion-scroll" 
+              ref="scrollContainer"
+              @mousedown="startDrag" 
+              @mouseleave="stopDrag" 
+              @mouseup="stopDrag" 
+              @mousemove="onDrag">
+              
             <button v-for="(q, i) in recommendedQuestions" :key="i" class="suggestion-chip" @click="sendMessage(q)">
               ✨ {{ q }}
             </button>
@@ -368,6 +429,9 @@ onMounted(() => {
             <span class="preview-badge" v-if="attachments.challenge.length">챌린지 {{ attachments.challenge.length }}건</span>
             <span class="preview-info">첨부됨</span>
           </div>
+          <button class="reset-all-btn" @click="resetAllAttachments">
+            초기화 ⟳
+          </button>
           <div class="input-wrapper">
             <textarea v-model="userInput" @keydown.enter.prevent="sendMessage()" placeholder="교수님께 궁금한 점을 물어보세요..."></textarea>
             <button @click="sendMessage()" :disabled="!userInput.trim() || isLoading" class="send-btn">➤</button>
@@ -472,9 +536,11 @@ onMounted(() => {
           </div>
           <div class="daily-list">
             <h4>📅 일일 식단 목록</h4>
-            <!-- <div class="list-actions" v-if="currentPlanDailyDiets.length > 0">
-               <button @click="toggleAll('diet', currentPlanDailyDiets)">전체 선택</button>
-            </div> -->
+            <div class="list-actions" v-if="currentPlanDailyDiets.length > 0">
+              <button @click="toggleAll('diet', currentPlanDailyDiets)">
+                {{ isCurrentListAllSelected('diet', currentPlanDailyDiets) ? '전체 해제' : '전체 선택' }}
+              </button>
+            </div>
             <div class="scroll-box">
               <div v-if="!selectedPlanId" class="empty-msg center">좌측에서 식단 계획을 선택해주세요.</div>
               <div v-else-if="currentPlanDailyDiets.length === 0" class="empty-msg center">해당 계획에 등록된 식단이 없습니다.</div>
@@ -565,6 +631,35 @@ onMounted(() => {
 .chat-header { padding: 16px 24px; background: white; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; }
 .chat-header h2 { font-size: 18px; font-weight: 700; margin: 0; color: #333; }
 .sidebar-toggle { padding: 6px 12px; border: 1px solid #ddd; background: white; border-radius: 20px; cursor: pointer; font-size: 13px; color: #333; white-space: nowrap; }
+
+/* Header right actions (namespaced within this component via scoped styles) */
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Reset header button style (visual emphasis, non-conflicting) */
+.reset-header-btn {
+  background: #FFF0F0;
+  color: #D32F2F;
+  border: 1px solid #FFCDD2;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.2s;
+}
+.reset-header-btn:hover { background: #FFCDD2; }
+.reset-icon { font-size: 14px; font-weight: bold; }
+
+/* Fade transition for header button appearance */
+.fade-enter-active, .fade-leave-active { transition: opacity 0.3s; }
+.fade-enter-from, .fade-leave-to { opacity: 0; }
 .chat-window { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 16px; background: #f0f2f5; }
 .message-row { display: flex; gap: 10px; max-width: 80%; }
 .message-row.user { align-self: flex-end; flex-direction: row-reverse; }
@@ -700,6 +795,58 @@ textarea:focus { border-color: #4CAF50; }
 .selection-count { font-size: 13px; color: #4CAF50; font-weight: 600; }
 .confirm-btn { background: #4CAF50; color: white; border: none; padding: 10px 20px; border-radius: 8px; font-weight: 600; cursor: pointer; }
 .confirm-btn:hover { background: #45a049; }
+
+.suggestion-scroll { 
+  display: flex; 
+  gap: 8px; 
+  overflow-x: auto; 
+  padding-bottom: 10px;
+  cursor: grab; /* 손바닥 모양 커서 */
+  
+  /* 스크롤바 숨기기 (크롬, 사파리, 오페라) */
+  -webkit-overflow-scrolling: touch;
+}
+.suggestion-scroll::-webkit-scrollbar { 
+  display: none; /* 스크롤바 숨김 */
+}
+.suggestion-scroll {
+  /* 스크롤바 숨기기 (파이어폭스, IE) */
+  scrollbar-width: none; 
+  -ms-overflow-style: none;
+}
+.suggestion-scroll:active {
+  cursor: grabbing; /* 잡았을 때 쥐는 모양 */
+}
+
+/* [NEW] 첨부 파일 미리보기 영역 레이아웃 */
+.attachment-preview { 
+  display: flex; 
+  justify-content: space-between; /* 양끝 정렬 */
+  align-items: center;
+  margin-bottom: 8px; 
+}
+.badges { display: flex; gap: 6px; }
+
+/* [NEW] 전체 초기화 버튼 스타일 */
+.reset-all-btn {
+  background: none;
+  border: none;
+  font-size: 11px;
+  color: #888;
+  cursor: pointer;
+  text-decoration: underline;
+  padding: 2px 5px;
+}
+.reset-all-btn:hover { color: #f44336; }
+
+/* 기존 스타일 유지하되 list-actions 위치 잡기 */
+.daily-list .list-actions {
+  padding: 8px 15px;
+  border-bottom: 1px solid #f0f0f0;
+  background: #fff;
+  display: flex;
+  justify-content: flex-end;
+}
 
 @media (max-width: 768px) {
   .data-sidebar { position: absolute; right: 0; top: 0; bottom: 0; width: 100%; }
