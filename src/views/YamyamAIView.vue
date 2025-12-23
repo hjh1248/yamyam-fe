@@ -2,6 +2,20 @@
 import { ref, computed, onMounted, nextTick } from 'vue'
 import AppHeader from '@/components/AppHeader.vue'
 import api from '@/util/axios'
+import MarkdownIt from 'markdown-it'
+
+// Markdown renderer 설정
+const md = new MarkdownIt({
+  html: false,        // HTML 태그 비활성화 (보안)
+  breaks: true,       // 줄바꿈을 <br>로 변환
+  linkify: true,      // URL을 자동으로 링크로 변환
+  typographer: true   // 따옴표, 대시 등을 예쁘게 변환
+})
+
+// Markdown 렌더링 함수
+const renderMarkdown = (content) => {
+  return md.render(content)
+}
 
 // ==========================================
 // 1. 상태 변수
@@ -399,7 +413,9 @@ onMounted(() => {
           <div v-for="(msg, idx) in messages" :key="idx" class="message-row" :class="msg.role">
             <div class="avatar" v-if="msg.role === 'assistant'">🎓</div>
             <div class="bubble">
-              <span style="white-space: pre-wrap;">{{ msg.content }}</span>
+              <!-- AI 응답은 마크다운 렌더링, 사용자 메시지는 일반 텍스트 -->
+              <div v-if="msg.role === 'assistant'" v-html="renderMarkdown(msg.content)" class="markdown-content"></div>
+              <span v-else style="white-space: pre-wrap;">{{ msg.content }}</span>
             </div>
           </div>
           <div v-if="isLoading" class="message-row assistant">
@@ -898,5 +914,156 @@ textarea:focus { border-color: #4CAF50; }
   .modal-content.large { width: 95%; height: 80vh; }
   .diet-layout { flex-direction: column; }
   .diet-layout .plan-list, .diet-layout .daily-list { width: 100%; height: 50%; border-right: none; border-bottom: 1px solid #eee; }
+}
+
+/* ========================================= */
+/* 마크다운 렌더링 스타일 */
+/* ========================================= */
+.markdown-content :deep(h1),
+.markdown-content :deep(h2),
+.markdown-content :deep(h3),
+.markdown-content :deep(h4),
+.markdown-content :deep(h5),
+.markdown-content :deep(h6) {
+  margin: 16px 0 8px 0;
+  font-weight: 700;
+  line-height: 1.3;
+  color: #2c3e50;
+}
+
+.markdown-content :deep(h1) { font-size: 1.8em; border-bottom: 2px solid #e0e0e0; padding-bottom: 8px; }
+.markdown-content :deep(h2) { font-size: 1.5em; border-bottom: 1px solid #e0e0e0; padding-bottom: 6px; }
+.markdown-content :deep(h3) { font-size: 1.3em; }
+.markdown-content :deep(h4) { font-size: 1.1em; }
+.markdown-content :deep(h5) { font-size: 1em; }
+.markdown-content :deep(h6) { font-size: 0.9em; color: #666; }
+
+.markdown-content :deep(p) {
+  margin: 8px 0;
+  line-height: 1.6;
+}
+
+.markdown-content :deep(strong) {
+  font-weight: 700;
+  color: #2c3e50;
+}
+
+.markdown-content :deep(em) {
+  font-style: italic;
+  color: #555;
+}
+
+.markdown-content :deep(ul),
+.markdown-content :deep(ol) {
+  margin: 8px 0;
+  padding-left: 24px;
+}
+
+.markdown-content :deep(li) {
+  margin: 4px 0;
+  line-height: 1.5;
+}
+
+.markdown-content :deep(ul) {
+  list-style-type: disc;
+}
+
+.markdown-content :deep(ol) {
+  list-style-type: decimal;
+}
+
+.markdown-content :deep(code) {
+  background: #f4f4f4;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: 0.9em;
+  color: #e83e8c;
+}
+
+.markdown-content :deep(pre) {
+  background: #f8f8f8;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  padding: 12px;
+  overflow-x: auto;
+  margin: 12px 0;
+}
+
+.markdown-content :deep(pre code) {
+  background: none;
+  padding: 0;
+  color: #333;
+  font-size: 0.85em;
+  line-height: 1.5;
+}
+
+.markdown-content :deep(blockquote) {
+  border-left: 4px solid #4CAF50;
+  background: #f9f9f9;
+  padding: 12px 16px;
+  margin: 12px 0;
+  color: #555;
+  font-style: italic;
+}
+
+.markdown-content :deep(blockquote p) {
+  margin: 0;
+}
+
+.markdown-content :deep(a) {
+  color: #4CAF50;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.markdown-content :deep(a:hover) {
+  text-decoration: underline;
+}
+
+.markdown-content :deep(hr) {
+  border: none;
+  border-top: 2px solid #e0e0e0;
+  margin: 16px 0;
+}
+
+.markdown-content :deep(table) {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 12px 0;
+  font-size: 0.9em;
+}
+
+.markdown-content :deep(table th),
+.markdown-content :deep(table td) {
+  border: 1px solid #e0e0e0;
+  padding: 8px 12px;
+  text-align: left;
+}
+
+.markdown-content :deep(table th) {
+  background: #f4f4f4;
+  font-weight: 700;
+  color: #333;
+}
+
+.markdown-content :deep(table tr:nth-child(even)) {
+  background: #f9f9f9;
+}
+
+.markdown-content :deep(img) {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+  margin: 12px 0;
+}
+
+/* 첫 번째 요소와 마지막 요소의 마진 제거 */
+.markdown-content :deep(> *:first-child) {
+  margin-top: 0;
+}
+
+.markdown-content :deep(> *:last-child) {
+  margin-bottom: 0;
 }
 </style>
