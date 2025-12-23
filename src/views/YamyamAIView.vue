@@ -429,9 +429,6 @@ onMounted(() => {
             <span class="preview-badge" v-if="attachments.challenge.length">챌린지 {{ attachments.challenge.length }}건</span>
             <span class="preview-info">첨부됨</span>
           </div>
-          <button class="reset-all-btn" @click="resetAllAttachments">
-            초기화 ⟳
-          </button>
           <div class="input-wrapper">
             <textarea v-model="userInput" @keydown.enter.prevent="sendMessage()" placeholder="교수님께 궁금한 점을 물어보세요..."></textarea>
             <button @click="sendMessage()" :disabled="!userInput.trim() || isLoading" class="send-btn">➤</button>
