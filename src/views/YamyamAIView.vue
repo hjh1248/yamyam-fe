@@ -997,4 +997,29 @@ textarea:focus { border-color: #4CAF50; }
 /* 첫 번째 요소와 마지막 요소 여백 제거 (말풍선 안에서의 균형 위해) */
 .markdown-content :deep(> *:first-child) { margin-top: 0; }
 .markdown-content :deep(> *:last-child) { margin-bottom: 0; }
+
+/* [NEW] 테이블 스타일 */
+.markdown-content :deep(table) {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 16px 0;
+  border: 1px solid #ddd;
+  font-size: 14px;
+}
+
+.markdown-content :deep(th),
+.markdown-content :deep(td) {
+  border: 1px solid #ddd;
+  padding: 10px 12px;
+  text-align: left;
+}
+
+.markdown-content :deep(th) {
+  background-color: #f5f5f5;
+  font-weight: 600;
+}
+
+.markdown-content :deep(tr:nth-child(even)) {
+  background-color: #f9f9f9;
+}
 </style>

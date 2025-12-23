@@ -1,5 +1,4 @@
 import axios from 'axios'
-import router from '@/router' // 라우터 가져오기 (페이지 이동용)
 
 // 1. axios 인스턴스 생성 (기본 설정)
 const instance = axios.create({
