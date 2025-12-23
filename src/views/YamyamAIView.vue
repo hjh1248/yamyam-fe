@@ -919,151 +919,81 @@ textarea:focus { border-color: #4CAF50; }
 /* ========================================= */
 /* 마크다운 렌더링 스타일 */
 /* ========================================= */
+.markdown-content {
+  text-align: left; /* 강제 왼쪽 정렬 (중요!) */
+  font-size: 15px;
+  line-height: 1.6;
+  color: #333;
+}
+
+/* 제목 스타일 */
 .markdown-content :deep(h1),
 .markdown-content :deep(h2),
-.markdown-content :deep(h3),
-.markdown-content :deep(h4),
-.markdown-content :deep(h5),
-.markdown-content :deep(h6) {
+.markdown-content :deep(h3) {
   margin: 16px 0 8px 0;
   font-weight: 700;
-  line-height: 1.3;
   color: #2c3e50;
 }
+.markdown-content :deep(h1) { font-size: 1.5em; border-bottom: 2px solid #eee; padding-bottom: 8px; }
+.markdown-content :deep(h2) { font-size: 1.3em; border-bottom: 1px solid #eee; padding-bottom: 6px; }
+.markdown-content :deep(h3) { font-size: 1.1em; }
 
-.markdown-content :deep(h1) { font-size: 1.8em; border-bottom: 2px solid #e0e0e0; padding-bottom: 8px; }
-.markdown-content :deep(h2) { font-size: 1.5em; border-bottom: 1px solid #e0e0e0; padding-bottom: 6px; }
-.markdown-content :deep(h3) { font-size: 1.3em; }
-.markdown-content :deep(h4) { font-size: 1.1em; }
-.markdown-content :deep(h5) { font-size: 1em; }
-.markdown-content :deep(h6) { font-size: 0.9em; color: #666; }
-
+/* 문단 간격 */
 .markdown-content :deep(p) {
-  margin: 8px 0;
-  line-height: 1.6;
+  margin: 0 0 10px 0; /* 하단 여백만 조금 줌 */
 }
 
+/* 강조 (Bold) */
 .markdown-content :deep(strong) {
-  font-weight: 700;
-  color: #2c3e50;
+  font-weight: 600;
+  color: #000;
 }
 
-.markdown-content :deep(em) {
-  font-style: italic;
-  color: #555;
-}
-
+/* 리스트 스타일 (가장 문제였던 부분) */
 .markdown-content :deep(ul),
 .markdown-content :deep(ol) {
-  margin: 8px 0;
-  padding-left: 24px;
+  margin: 8px 0 16px 0;
+  padding-left: 24px; /* 들여쓰기 확보 */
 }
 
 .markdown-content :deep(li) {
-  margin: 4px 0;
+  margin-bottom: 6px;
   line-height: 1.5;
+  list-style-position: outside; /* 불릿이 텍스트 밖으로 */
 }
 
 .markdown-content :deep(ul) {
-  list-style-type: disc;
+  list-style-type: disc; /* 점 모양 강제 */
 }
 
 .markdown-content :deep(ol) {
-  list-style-type: decimal;
+  list-style-type: decimal; /* 숫자 모양 강제 */
 }
 
-.markdown-content :deep(code) {
-  background: #f4f4f4;
-  padding: 2px 6px;
-  border-radius: 4px;
-  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-  font-size: 0.9em;
-  color: #e83e8c;
-}
-
-.markdown-content :deep(pre) {
-  background: #f8f8f8;
-  border: 1px solid #e0e0e0;
-  border-radius: 6px;
-  padding: 12px;
-  overflow-x: auto;
-  margin: 12px 0;
-}
-
-.markdown-content :deep(pre code) {
-  background: none;
-  padding: 0;
-  color: #333;
-  font-size: 0.85em;
-  line-height: 1.5;
-}
-
+/* 인용구 */
 .markdown-content :deep(blockquote) {
   border-left: 4px solid #4CAF50;
-  background: #f9f9f9;
-  padding: 12px 16px;
+  background: #f1f8e9;
+  padding: 10px 15px;
   margin: 12px 0;
   color: #555;
-  font-style: italic;
+  border-radius: 0 4px 4px 0;
 }
-
 .markdown-content :deep(blockquote p) {
   margin: 0;
 }
 
-.markdown-content :deep(a) {
-  color: #4CAF50;
-  text-decoration: none;
-  font-weight: 600;
-}
-
-.markdown-content :deep(a:hover) {
-  text-decoration: underline;
-}
-
-.markdown-content :deep(hr) {
-  border: none;
-  border-top: 2px solid #e0e0e0;
-  margin: 16px 0;
-}
-
-.markdown-content :deep(table) {
-  width: 100%;
-  border-collapse: collapse;
-  margin: 12px 0;
+/* 코드 블럭 */
+.markdown-content :deep(code) {
+  background: #f5f5f5;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: monospace;
+  color: #d63384;
   font-size: 0.9em;
 }
 
-.markdown-content :deep(table th),
-.markdown-content :deep(table td) {
-  border: 1px solid #e0e0e0;
-  padding: 8px 12px;
-  text-align: left;
-}
-
-.markdown-content :deep(table th) {
-  background: #f4f4f4;
-  font-weight: 700;
-  color: #333;
-}
-
-.markdown-content :deep(table tr:nth-child(even)) {
-  background: #f9f9f9;
-}
-
-.markdown-content :deep(img) {
-  max-width: 100%;
-  height: auto;
-  border-radius: 8px;
-  margin: 12px 0;
-}
-
-/* 첫 번째 요소와 마지막 요소의 마진 제거 */
-.markdown-content :deep(> *:first-child) {
-  margin-top: 0;
-}
-
-.markdown-content :deep(> *:last-child) {
-  margin-bottom: 0;
-}
+/* 첫 번째 요소와 마지막 요소 여백 제거 (말풍선 안에서의 균형 위해) */
+.markdown-content :deep(> *:first-child) { margin-top: 0; }
+.markdown-content :deep(> *:last-child) { margin-bottom: 0; }
 </style>
