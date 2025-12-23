@@ -56,7 +56,7 @@ const totalNutrients = computed(() => {
     const quantity = Number(food.quantity)
     if (food.foodId && quantity > 0) {
       const multiplier = quantity / 100
-      totals.calorie += (food.energyPer100 || 0) * multiplier
+      totals.calorie += (food.caloriePer100 || 0) * multiplier
       totals.protein += (food.proteinPer100 || 0) * multiplier
       totals.carbs += (food.carbohydratePer100 || 0) * multiplier
       totals.fat += (food.fatPer100 || 0) * multiplier
@@ -99,7 +99,7 @@ const foodNutritionDetails = computed(() => {
       foodName: food.foodName,
       quantity: `${quantity}${food.unit}`,
       nutrition: {
-        calorie: Math.round((food.energyPer100 || 0) * multiplier),
+        calorie: Math.round((food.caloriePer100 || 0) * multiplier),
         protein: Math.round((food.proteinPer100 || 0) * multiplier * 10) / 10,
         carbs: Math.round((food.carbohydratePer100 || 0) * multiplier * 10) / 10,
         fat: Math.round((food.fatPer100 || 0) * multiplier * 10) / 10,
@@ -146,15 +146,12 @@ const loadMealData = async () => {
         mealFoodId: food.mealFoodId,
         quantity: food.quantity,
         unit: food.baseUnit || 'g',
-        energyPer100: food.energyPer100 || 0,
+        caloriePer100: food.caloriePer100 || 0,
         proteinPer100: food.proteinPer100 || 0,
         carbohydratePer100: food.carbohydratePer100 || 0,
         fatPer100: food.fatPer100 || 0,
         sugarPer100: food.sugarPer100 || 0,
-        sodiumPer100: food.sodiumPer100 || 0,
-        cholesterolPer100: food.cholesterolPer100 || 0,
-        saturatedFatPer100: food.saturatedFatPer100 || 0,
-        transFatPer100: food.transFatPer100 || 0
+        sodiumPer100: food.sodiumPer100 || 0
       }))
       mealFoods.value = loadedFoods
       initialMealFoods.value = JSON.parse(JSON.stringify(loadedFoods))
@@ -176,15 +173,12 @@ const addFoodRow = () => {
     foodName: '',
     quantity: '',
     unit: 'g',
-    energyPer100: 0,
+    caloriePer100: 0,
     proteinPer100: 0,
     carbohydratePer100: 0,
     fatPer100: 0,
     sugarPer100: 0,
-    sodiumPer100: 0,
-    cholesterolPer100: 0,
-    saturatedFatPer100: 0,
-    transFatPer100: 0
+    sodiumPer100: 0
   })
 }
 
@@ -221,15 +215,12 @@ const selectFood = (food, index) => {
     mealFoodId: null,
     quantity: mealFoods.value[index].quantity || 100,
     unit: food.baseUnit || 'g',
-    energyPer100: food.caloriePer100 || 0,
+    caloriePer100: food.caloriePer100 || 0,
     proteinPer100: food.proteinPer100 || 0,
     carbohydratePer100: food.carbohydratePer100 || 0,
     fatPer100: food.fatPer100 || 0,
     sugarPer100: food.sugarPer100 || 0,
-    sodiumPer100: food.sodiumPer100 || 0,
-    cholesterolPer100: food.cholesterolPer100 || 0,
-    saturatedFatPer100: food.saturatedFatPer100 || 0,
-    transFatPer100: food.transFatPer100 || 0
+    sodiumPer100: food.sodiumPer100 || 0
   }
 
   showAutocomplete.value = false
@@ -243,7 +234,7 @@ const onFoodNameChange = (value, index) => {
 
   if (mealFoods.value[index].foodId) {
     mealFoods.value[index].foodId = null
-    mealFoods.value[index].energyPer100 = 0
+    mealFoods.value[index].caloriePer100 = 0
     mealFoods.value[index].proteinPer100 = 0
     mealFoods.value[index].carbohydratePer100 = 0
   }
@@ -425,7 +416,7 @@ onUnmounted(() => {
                   <label class="input-label">칼로리</label>
                   <div class="calorie-input-group">
                     <input
-                      :value="food.foodId && food.quantity && food.energyPer100 ? Math.round(food.energyPer100 * Number(food.quantity) / 100) : 0"
+                      :value="food.foodId && food.quantity && food.caloriePer100 ? Math.round(food.caloriePer100 * Number(food.quantity) / 100) : 0"
                       type="text"
                       readonly
                       class="food-input calorie-input"
@@ -450,7 +441,7 @@ onUnmounted(() => {
                 <div class="food-details-view">
                   <span class="food-quantity-view">{{ food.quantity }}{{ food.unit }}</span>
                   <span class="food-calorie-badge">
-                    {{ Math.round(food.energyPer100 * food.quantity / 100) }} kcal
+                    {{ Math.round(food.caloriePer100 * food.quantity / 100) }} kcal
                   </span>
                 </div>
               </div>
