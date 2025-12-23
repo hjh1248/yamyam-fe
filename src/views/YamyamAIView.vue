@@ -290,12 +290,13 @@ const recommendedQuestions = computed(() => {
   const hasDiet = attachments.value.diet.length > 0
   const hasChallenge = attachments.value.challenge.length > 0
 
-  if (hasDiet && hasBody) list.push('이 식단 완료 후 예상 몸무게 알려줘')
+  if (hasDiet && hasBody) list.push('이 식단대로 한 달 동안 먹으면, 내 몸무게는 몇 kg가 될까? 📉')
+  if (hasBody && hasChallenge) list.push('이렇게 먹어도 챌린지 성공할 수 있을까?')
+  if (hasDiet && hasChallenge) list.push()
   if (!hasBody && !hasDiet && !hasChallenge) return ['다이어트 꿀팁 알려줘', '식욕 참는 법 알려줘']
-  if (hasBody) list.push('내 신체 정보는 어떤 연예인과 비슷해?')
-  if (hasBody) list.push('내 신체 정보 분석해줘')  
-  if (hasDiet) list.push('선택한 식단의 영양 밸런스 평가해줘')
-  if (hasChallenge) list.push('이 챌린지 성공 꿀팁 알려줘')
+  if (hasBody) list.push('내 신체 정보는 어떤 연예인과 비슷해?', '내 신체 정보 분석해줘')
+  if (hasDiet) list.push('선택한 식단의 영양 밸런스 평가해줘', '이거 다 먹으면 스쿼트 몇 개 해야 칼로리 다 태울까? 🔥')
+  if (hasChallenge) list.push('이 챌린지 성공 꿀팁 알려줘', '지금 내 진행 속도면 챌린지 성공 확률이 몇 %야?')
   return list.slice(0, 4)
 })
 
