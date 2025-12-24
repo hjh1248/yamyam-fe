@@ -60,7 +60,6 @@
               </div>
 
               <h3 class="challenge-title">{{ challenge.title }}</h3>
-
               <p class="challenge-desc">{{ challenge.description }}</p>
 
               <div v-if="challenge.challengeStatus === 'DELETED'" class="deleted-notice">
@@ -76,7 +75,7 @@
 
               <p class="challenge-date">{{ challenge.startDate }} ~ {{ challenge.endDate }}</p>
               
-              <button @click="quitChallengeBtn(challenge)" class="btn-quit">
+              <button @click.stop="quitChallengeBtn(challenge)" class="btn-quit">
                 {{ challenge.challengeStatus === 'DELETED' ? '목록에서 삭제' : '포기하기' }}
               </button>
             </div>
@@ -90,7 +89,6 @@
         <section class="challenge-section">
           <div class="section-header-row">
             <h2 class="section-title">참여 가능한 챌린지</h2>
-            
             <button @click="router.push('/challenges')" class="btn-link">
               전체 챌린지 라운지 <span class="arrow">→</span>
             </button>
@@ -115,7 +113,8 @@
               <h3 class="challenge-title">{{ challenge.title }}</h3>
               <p class="challenge-desc">{{ challenge.description }}</p>
               <p class="challenge-date">{{ challenge.startDate }} ~ {{ challenge.endDate }}</p>
-              <button @click="openJoinModal(challenge)" class="btn-join">참여하기</button>
+              
+              <button @click.stop="openJoinModal(challenge)" class="btn-join">참여하기</button>
             </div>
           </div>
           
@@ -163,7 +162,7 @@
     <div v-if="showQuitModal" class="modal-overlay" @click="showQuitModal = false">
       <div class="modal-content small-modal" @click.stop>
         <h3>정말 포기하시겠습니까?</h3>
-        <p class="confirm-message red-text">이 작업은 되돌릴 수 없습니다.</p>
+        <p class="confirm-message red-text">기록이 유지되고 다시 도전할 수 있습니다.</p>
         <div class="modal-footer">
           <button @click="confirmQuit" class="quit-btn">포기하기</button>
           <button @click="showQuitModal = false" class="cancel-btn">취소</button>
@@ -235,7 +234,11 @@ const fetchChallenges = async () => {
             api.get('/api/challenges/my'),
             api.get('/api/challenges/available')
         ])
-        myChallenges.value = myRes.data.map(c => ({...c, startDate: formatDate(c.startDate), endDate: formatDate(c.endDate)}))
+        
+        // ★ [핵심 수정 1] 포기한 챌린지('STOPPED')는 목록에서 제외
+        const activeChallenges = myRes.data.filter(c => c.participationStatus !== 'STOPPED')
+
+        myChallenges.value = activeChallenges.map(c => ({...c, startDate: formatDate(c.startDate), endDate: formatDate(c.endDate)}))
         availableChallenges.value = availRes.data.map(c => ({...c, startDate: formatDate(c.startDate), endDate: formatDate(c.endDate)}))
     } catch (e) { console.error(e) }
 }
@@ -278,19 +281,35 @@ const confirmJoin = async () => {
   } catch (e) { displayToast('참여 실패') }
 }
 
+// 포기하기 버튼 클릭 핸들러
 const quitChallengeBtn = (challenge) => {
-  if (challenge.challengeStatus === 'DELETED') confirmQuit(challenge)
-  else { selectedChallenge.value = challenge; showQuitModal.value = true; }
+  // 이미 삭제된 챌린지라면 바로 목록에서 제거 로직 수행
+  if (challenge.challengeStatus === 'DELETED') {
+    confirmQuit(challenge)
+  } else { 
+    // 진행 중인 챌린지라면 모달 띄우기
+    selectedChallenge.value = challenge; 
+    showQuitModal.value = true; 
+  }
 }
 
-const confirmQuit = async (challengeParam) => {
-  const target = challengeParam || selectedChallenge.value
+// ★ [핵심 수정 2] 포기 확정 로직 개선
+const confirmQuit = async (directTarget) => {
+  // 모달 버튼 클릭 시에는 event 객체가 넘어오므로, 명시적으로 넘겨준 target이 없다면 selectedChallenge 사용
+  // directTarget이 DOM Event 객체인지 확인 (id 속성이 없으면 이벤트 객체로 간주)
+  const target = (directTarget && directTarget.id) ? directTarget : selectedChallenge.value
+
+  if (!target) return;
+
   try {
     await api.delete(`/api/challenges/${target.id}/quit`)
     showQuitModal.value = false
-    await fetchChallenges()
-    displayToast('목록에서 제거되었습니다.')
-  } catch(e) { displayToast('오류 발생') }
+    await fetchChallenges() // ★ 여기서 목록을 다시 불러올 때 STOPPED가 필터링되어 사라짐
+    displayToast('챌린지를 포기했습니다.')
+  } catch(e) { 
+    console.error(e)
+    displayToast('오류 발생') 
+  }
 }
 
 onMounted(async () => {
@@ -299,7 +318,6 @@ onMounted(async () => {
 })
 
 const goToDetail = (id) => {
-  // router/index.js에 등록된 경로와 맞춰주세요 (예: /challenge/:id)
   router.push(`/challenge/${id}`)
 }
 </script>
